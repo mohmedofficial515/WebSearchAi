@@ -39,6 +39,7 @@ from urllib.parse import urlparse
 
 from ..config import settings
 from ..core.browser import BrowserSession
+from ..core.prompt_loader import load_prompt
 from ..core.search_agent import RankedCandidate, SearchAgent
 from ..llm.providers import get_provider
 from ..reports.component_viewer import render_viewer
@@ -200,41 +201,8 @@ _EXTRACT_JS = r"""
 
 # ── LLM conversion (HTML → JSX + Arabic description in one call) ────────────
 
-_CONVERT_SYSTEM = """You take a raw HTML or HTML-ish UI snippet and produce a
-clean, idiomatic React functional component (JSX). Also write a short Arabic
-description for a designer/developer reading the gallery.
-
-Rules for the JSX:
-  - Use a single default-exported functional component.
-  - Replace `class=` with `className=`, `for=` with `htmlFor=`, self-close
-    void elements (<img />, <input />, <br />, <hr />, <meta />).
-  - Keep Tailwind / Bootstrap utility class names AS-IS. Do not invent CSS.
-  - Inline `style="..."` becomes a JSX object: style={{ key: 'value' }}.
-  - Remove obvious analytics / tracking attributes (data-gtm-*, onclick handlers
-    with inline JS, srcset bloat) — keep the structure clean.
-  - Replace `<svg>` blocks too long for the snippet with the original svg
-    intact; do NOT shorten them.
-  - Strip absolute image URLs that look like CDN tracking pixels (1x1 etc.)
-    but keep real image src attributes.
-  - Don't add imports. Don't add TypeScript. Don't add comments unless the
-    original had a meaningful one. Don't wrap in extra divs.
-  - Name the component descriptively (e.g. `PrimaryNavbar`, `PricingCard`,
-    `DashboardSidebar`). camelCase, no spaces, no special chars.
-
-Rules for the Arabic description:
-  - 2–3 sentences, no emoji.
-  - Mention: what the component is, key visual traits (light/dark, icons,
-    layout), and one practical use case.
-  - Write in clear modern standard Arabic (not dialect).
-
-Reply with JSON ONLY:
-{
-  "name": "<ComponentName>",
-  "jsx": "<full JSX source — including `export default function ...`>",
-  "description_ar": "<2-3 Arabic sentences>",
-  "tags": ["<tag1>", "<tag2>"]   // e.g. ["navbar","tailwind","responsive"]
-}
-"""
+def _convert_system(locale: str = "ar") -> str:
+    return load_prompt("skills/find_components", locale=locale)
 
 
 async def _llm_convert(llm: Any, raw_html: str, query: str, source_host: str) -> dict[str, Any]:
@@ -245,7 +213,7 @@ async def _llm_convert(llm: Any, raw_html: str, query: str, source_host: str) ->
         f"RAW SNIPPET (HTML or JSX-ish):\n```\n{raw_html[:10000]}\n```"
     )
     try:
-        data = await llm.chat_json(_CONVERT_SYSTEM, user)
+        data = await llm.chat_json(_convert_system(), user)
         if not isinstance(data, dict):
             raise ValueError("non-dict")
         return {

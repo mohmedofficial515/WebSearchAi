@@ -8,24 +8,8 @@ from pathlib import Path
 
 from ..config import settings
 from ..core.agent import Agent
+from ..core.prompt_loader import load_prompt
 from ..llm.providers import get_provider
-
-
-REPORT_SYSTEM = """You are a senior product analyst.
-
-You will receive a transcript of a browser-using AI agent that explored a website.
-Produce a JSON report:
-{
-  "site": "...",
-  "purpose": "...",                       # what the site does
-  "main_features": ["..."],               # 5-15 user-visible features
-  "key_user_flows": ["..."],              # signup, checkout, etc.
-  "tech_signals": ["..."],                # framework hints, third-party scripts
-  "design_notes": {"palette":[..],"typography":"...","layout":"..."},
-  "clone_recipe": ["short ordered steps to rebuild a similar site"],
-  "risks_or_blockers": ["..."]
-}
-"""
 
 
 @dataclass
@@ -62,7 +46,7 @@ async def explore(site_url: str, depth_hint: str = "thorough") -> ExploreReport:
 
     llm = get_provider(settings)
     try:
-        report = await llm.chat_json(REPORT_SYSTEM, transcript)
+        report = await llm.chat_json(load_prompt("skills/explore"), transcript)
     finally:
         await llm.close()
 

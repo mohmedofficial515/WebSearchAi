@@ -14,21 +14,13 @@ from bs4 import BeautifulSoup
 
 from ..config import settings
 from ..core.browser import BrowserSession
+from ..core.prompt_loader import load_prompt
 from ..llm.mistral_client import MistralClient
 from ..utils.logger import log
 
 
-REBUILD_SYSTEM = """You are a senior front-end engineer.
-
-You will receive the captured HTML + CSS of a single web page. Your job is to
-rebuild it as a clean, modern, responsive single-file HTML page using only:
-- Tailwind CSS via <script src="https://cdn.tailwindcss.com"></script>
-- Plain semantic HTML
-- No external images you didn't see in the source (use the same image URLs).
-- Preserve copy/text faithfully.
-- Improve accessibility, responsive layout, and structure.
-
-Output JUST the final HTML, nothing else."""
+def _rebuild_system(locale: str = "ar") -> str:
+    return load_prompt("skills/clone", locale=locale)
 
 
 @dataclass
@@ -110,7 +102,7 @@ async def clone(url: str, *, max_assets: int = 60) -> CloneResult:
         )
         rebuilt = await llm.chat(
             messages=[
-                {"role": "system", "content": REBUILD_SYSTEM},
+                {"role": "system", "content": _rebuild_system()},
                 {"role": "user", "content": prompt_user},
             ],
             max_tokens=8000,
