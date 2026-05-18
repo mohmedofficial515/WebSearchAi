@@ -25,6 +25,7 @@ export function AppShell({
 }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [drawerDismissed, setDrawerDismissed] = useState(false);
+  const [mobileLiveOpen, setMobileLiveOpen] = useState(false);
 
   const drawerShouldShow =
     taskStream.status === 'connecting' ||
@@ -42,25 +43,32 @@ export function AppShell({
     prevShouldShow.current = drawerShouldShow;
   }, [drawerShouldShow]);
 
-  // Escape = close right drawer
+  // Close mobile live sheet when task stream ends
+  useEffect(() => {
+    if (!drawerShouldShow) setMobileLiveOpen(false);
+  }, [drawerShouldShow]);
+
+  // Escape = close right drawer or mobile panels
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && drawerOpen) {
-        setDrawerDismissed(true);
+      if (e.key === 'Escape') {
+        if (mobileLiveOpen) { setMobileLiveOpen(false); return; }
+        if (drawerOpen) { setDrawerDismissed(true); return; }
+        if (sidebarOpen) setSidebarOpen(false);
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [drawerOpen]);
+  }, [drawerOpen, mobileLiveOpen, sidebarOpen]);
 
   return (
     <div className="flex h-screen overflow-hidden bg-white dark:bg-slate-950">
-      {/* Sidebar */}
+
+      {/* ── Desktop sidebar (lg+) ── */}
       <div
         className={`
-          flex-shrink-0 transition-all duration-200
+          hidden lg:flex flex-shrink-0 transition-all duration-200
           ${sidebarOpen ? 'w-60' : 'w-0 overflow-hidden'}
-          lg:block
         `}
       >
         <Sidebar
@@ -71,16 +79,52 @@ export function AppShell({
         />
       </div>
 
-      {/* Main column */}
+      {/* ── Mobile sidebar overlay (< lg) ── */}
+      <AnimatePresence>
+        {sidebarOpen && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              key="sidebar-backdrop"
+              className="fixed inset-0 z-30 bg-black/40 lg:hidden"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18 }}
+              onClick={() => setSidebarOpen(false)}
+            />
+            {/* Sidebar panel */}
+            <motion.div
+              key="sidebar-panel"
+              className="fixed inset-y-0 start-0 z-40 w-60 lg:hidden"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+            >
+              <Sidebar
+                tasks={tasks}
+                activeTaskId={activeTaskId}
+                onNewChat={() => { onNewChat(); setSidebarOpen(false); }}
+                onSelectTask={(id) => { onSelectTask(id); setSidebarOpen(false); }}
+              />
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* ── Main column ── */}
       <div className="flex flex-1 flex-col min-w-0">
         <TopBar
           sidebarOpen={sidebarOpen}
           onToggleSidebar={() => setSidebarOpen((v) => !v)}
+          liveActive={drawerShouldShow}
+          onShowLive={() => setMobileLiveOpen(true)}
         />
         <main className="flex-1 overflow-y-auto">{children}</main>
       </div>
 
-      {/* Right drawer — live execution panel */}
+      {/* ── Desktop right drawer (lg+) ── */}
       <AnimatePresence>
         {drawerOpen && (
           <motion.div
@@ -100,6 +144,39 @@ export function AppShell({
             </button>
             <RightDrawer taskStream={taskStream} />
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Mobile bottom live sheet (< lg) ── */}
+      <AnimatePresence>
+        {mobileLiveOpen && (
+          <>
+            <motion.div
+              key="live-backdrop"
+              className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18 }}
+              onClick={() => setMobileLiveOpen(false)}
+            />
+            <motion.div
+              key="live-sheet"
+              className="fixed inset-x-0 bottom-0 z-50 h-[55vh] lg:hidden rounded-t-2xl overflow-hidden shadow-xl"
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+            >
+              {/* Handle bar */}
+              <div className="bg-slate-50 dark:bg-slate-900 flex justify-center pt-3 pb-1">
+                <div className="w-10 h-1 rounded-full bg-slate-300 dark:bg-slate-600" />
+              </div>
+              <div className="h-full">
+                <RightDrawer taskStream={taskStream} />
+              </div>
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
     </div>

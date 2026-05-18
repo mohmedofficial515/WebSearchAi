@@ -5,9 +5,11 @@ import { useSettingsStore } from '@/stores/settingsStore';
 interface TopBarProps {
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
+  liveActive?: boolean;
+  onShowLive?: () => void;
 }
 
-export function TopBar({ sidebarOpen, onToggleSidebar }: TopBarProps) {
+export function TopBar({ sidebarOpen, onToggleSidebar, liveActive, onShowLive }: TopBarProps) {
   const { t, i18n } = useTranslation();
   const { theme, toggleTheme, locale, setLocale } = useSettingsStore();
 
@@ -41,6 +43,18 @@ export function TopBar({ sidebarOpen, onToggleSidebar }: TopBarProps) {
       </span>
 
       <div className="flex-1" />
+
+      {/* Mobile live indicator (< lg) */}
+      {liveActive && onShowLive && (
+        <button
+          onClick={onShowLive}
+          aria-label="عرض التنفيذ المباشر"
+          className="lg:hidden flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 text-xs font-medium animate-pulse"
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+          مباشر
+        </button>
+      )}
 
       {/* Locale toggle */}
       <button
