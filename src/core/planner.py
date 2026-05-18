@@ -7,52 +7,12 @@ from dataclasses import dataclass
 
 from typing import Any
 
+from .prompt_loader import load_prompt
 
-SYSTEM_PLANNER = """You are the planning brain of a web-browsing AI agent.
 
-Given a user goal, produce a JSON plan with these fields:
-{
-  "goal": "<concise restatement>",
-  "success_criteria": ["<observable signals success>"],
-  "starting_url": "<best URL to open first, or null>",
-  "subtasks": ["<short steps a browser-using human would take>"]
-}
-
-LANGUAGE & BRAND-NAME RULES (critical for non-English goals):
-- If the user's goal is in Arabic, write your queries IN ARABIC.
-  Do NOT translate the user's terms — search engines index Arabic
-  pages natively and Arabic searches return Arabic-content sites that
-  match what the user actually wants.
-- Brand names, app names, and product names that appear in Arabic
-  in the goal MUST stay in Arabic OR use the brand's canonical
-  English spelling. NEVER invent a transliteration on your own.
-    "ديل للعقارات"  →  use "ديل للعقارات" or "Deal Real Estate", NOT "Del".
-    "كريم"          →  use "كريم" or "Careem", NOT "Krim".
-    "حراج"          →  use "حراج" or "Haraj", NOT "Harag".
-  When in doubt, KEEP THE ARABIC.
-- For "تطبيق X" (app X) or "موقع X" (site X), search FIRST with
-  the literal Arabic name plus the category — e.g. for
-  "تطبيق ديل للعقارات السعودية" use the query
-  "تطبيق ديل للعقارات السعودية" or "ديل عقارات السعودية".
-
-TOOL USAGE:
-- The agent has a native search_web tool (API-backed, no CAPTCHA).
-  Whenever a subtask is "find/research/look up something on the web",
-  phrase it as "search_web for X". Reserve the browser for visiting
-  specific URLs.
-
-starting_url RULES (very important — wrong URLs kill the run):
-- Set starting_url to a concrete URL **ONLY** when the user's goal
-  CONTAINS that full URL literally (e.g. "summarize https://example.com/x").
-- For ANY mention of an app, brand, site, or platform by NAME (e.g.
-  "تطبيق ديل", "موقع كذا", "the Deal app", "Bayut"), DO NOT invent
-  a URL — set starting_url to null. Make the first subtask a
-  search_web call. The agent's search engine knows the real URL;
-  your guess will almost certainly be wrong (deal.sa vs dealapp.sa,
-  bayut.sa vs bayut.com, etc.) and a wrong URL wastes the entire run.
-- Same rule for government / official sites: search_web first.
-
-Be concrete, not verbose. 4-10 subtasks max. Output JSON only."""
+def _system_planner(locale: str = "ar") -> str:
+    """Load the planner system prompt for the given locale."""
+    return load_prompt("planner", locale=locale)
 
 
 ACTION_SCHEMA_DESC = """\
@@ -167,8 +127,9 @@ class Plan:
 
 
 class Planner:
-    def __init__(self, llm: Any) -> None:
+    def __init__(self, llm: Any, *, locale: str = "ar") -> None:
         self.llm = llm
+        self.locale = locale
 
     async def plan(self, goal: str, context: str | None = None) -> Plan:
         """Produce a structured plan from a natural-language goal.
@@ -182,7 +143,7 @@ class Planner:
         if context:
             user += f"\n\nADDITIONAL CONTEXT:\n{context}"
         try:
-            data = await self.llm.chat_json(SYSTEM_PLANNER, user)
+            data = await self.llm.chat_json(_system_planner(self.locale), user)
             if not isinstance(data, dict):
                 raise ValueError(f"planner returned non-dict: {type(data).__name__}")
         except Exception as exc:  # noqa: BLE001
