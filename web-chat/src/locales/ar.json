@@ -62,10 +62,76 @@
   },
   "settings": {
     "title": "الإعدادات",
-    "comingSoon": "قريباً..."
+    "comingSoon": "قريباً...",
+    "tabs": {
+      "providers": "المزودون",
+      "accounts": "الحسابات",
+      "archive": "الأرشيف"
+    }
   },
   "artifacts": {
     "title": "الملفات",
     "comingSoon": "قريباً..."
+  },
+  "providers": {
+    "title": "مزودو الذكاء الاصطناعي",
+    "setActive": "تعيين كنشط",
+    "active": "نشط",
+    "test": "اختبار",
+    "testing": "جارٍ الاختبار...",
+    "save": "💾 حفظ الكل",
+    "saveOk": "✓ تم الحفظ!",
+    "saveError": "✗ خطأ",
+    "testOk": "✓ متصل",
+    "testFail": "✗ فشل الاتصال",
+    "getKey": "احصل على مفتاح API",
+    "configured": "مُهيَّأ",
+    "notConfigured": "غير مُهيَّأ",
+    "liveModels": "نماذج حية",
+    "loadingModels": "جارٍ تحميل النماذج...",
+    "autoProvider": "اختيار تلقائي"
+  },
+  "accounts": {
+    "title": "الحسابات المسجلة",
+    "refresh": "تحديث",
+    "empty": "لا توجد حسابات بعد — استخدم مهارة 📧 التسجيل المؤقت",
+    "verified": "✓ مفعّل",
+    "unverified": "— غير مفعّل",
+    "delete": "🗑 حذف",
+    "confirmDelete": "هل تريد حذف هذا الحساب نهائياً؟ سيُحذف ملف الجلسة.",
+    "loading": "جارٍ التحميل...",
+    "loadError": "تعذّر تحميل الحسابات"
+  },
+  "archive": {
+    "title": "أرشيف المهام",
+    "search": "بحث في الأرشيف...",
+    "empty": "لا توجد مهام مؤرشفة بعد. تُحفظ المهام الناجحة تلقائياً هنا.",
+    "loading": "جارٍ التحميل...",
+    "searchEmpty": "لا توجد نتائج",
+    "replay": "↻ إعادة التشغيل",
+    "delete": "🗑 حذف",
+    "confirmDelete": "حذف هذه المهمة من الأرشيف نهائياً؟",
+    "goal": "الهدف",
+    "summary": "الملخص",
+    "confidence": "الثقة",
+    "success": "✅ نجاح",
+    "fail": "❌ فشل",
+    "extractions": "الاستخراجات",
+    "plan": "الخطة",
+    "result": "النتيجة الكاملة",
+    "close": "إغلاق",
+    "loadError": "تعذّر التحميل"
+  },
+  "archiveSuggestion": {
+    "found": "وُجدت نتيجة مشابهة في الأرشيف",
+    "use": "استخدام النتيجة",
+    "dismiss": "تجاهل",
+    "score": "تطابق {{pct}}%"
+  },
+  "attachment": {
+    "uploading": "جارٍ الرفع...",
+    "remove": "إزالة",
+    "uploadError": "فشل الرفع",
+    "dragDrop": "أسقط الملفات هنا"
   }
 }

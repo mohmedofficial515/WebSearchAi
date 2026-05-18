@@ -7,6 +7,7 @@ import { useTasksStore } from '@/stores/tasksStore';
 import type { Message } from '@/lib/types';
 import { apiPost } from '@/lib/api';
 import type { ChatResponse } from '@/lib/api';
+import type { AttachmentEntry } from '@/components/chat/AttachmentPreview';
 
 // Re-export so route imports stay in one place
 export type { Message };
@@ -29,7 +30,7 @@ export default function ChatPage() {
   const addMsg = useCallback((msg: Message) => setMessages((prev) => [...prev, msg]), []);
 
   const handleSubmit = useCallback(
-    async (text: string, skillOverride: string | null) => {
+    async (text: string, skillOverride: string | null, _attachments?: AttachmentEntry[]) => {
       if (!text || sending) return;
 
       addMsg({ id: newId(), role: 'user', text, timestamp: Date.now() });
@@ -38,6 +39,11 @@ export default function ChatPage() {
       try {
         const body: Record<string, unknown> = { message: text };
         if (skillOverride) body.force_skill = skillOverride;
+        // Attach uploaded file URLs so backend can reference them
+        const doneAttachments = (_attachments ?? []).filter((a) => a.status === 'done' && a.url);
+        if (doneAttachments.length > 0) {
+          body.attachments = doneAttachments.map((a) => ({ url: a.url, mime: a.mime }));
+        }
 
         const res = await apiPost<ChatResponse>('/api/chat', body);
 
@@ -108,7 +114,7 @@ export default function ChatPage() {
   );
 
   const handleSuggestion = useCallback(
-    (prompt: string) => void handleSubmit(prompt, null),
+    (prompt: string) => void handleSubmit(prompt, null, []),
     [handleSubmit],
   );
 
@@ -145,14 +151,14 @@ export default function ChatPage() {
         <div className="flex-1 overflow-y-auto">
           <ChatThread
             messages={messages}
-            onChip={(t) => void handleSubmit(t, null)}
+            onChip={(chip) => void handleSubmit(chip, null, [])}
             onSuggestion={handleSuggestion}
             onContinue={handleContinue}
             onEnd={handleEnd}
           />
         </div>
         <Composer
-          onSubmit={(t, s) => void handleSubmit(t, s)}
+          onSubmit={(txt, s, atts) => void handleSubmit(txt, s, atts)}
           disabled={sending}
         />
       </div>

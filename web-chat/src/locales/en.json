@@ -62,10 +62,76 @@
   },
   "settings": {
     "title": "Settings",
-    "comingSoon": "Coming soon..."
+    "comingSoon": "Coming soon...",
+    "tabs": {
+      "providers": "Providers",
+      "accounts": "Accounts",
+      "archive": "Archive"
+    }
   },
   "artifacts": {
     "title": "Artifacts",
     "comingSoon": "Coming soon..."
+  },
+  "providers": {
+    "title": "AI Providers",
+    "setActive": "Set Active",
+    "active": "Active",
+    "test": "Test",
+    "testing": "Testing...",
+    "save": "💾 Save All",
+    "saveOk": "✓ Saved!",
+    "saveError": "✗ Error",
+    "testOk": "✓ Connected",
+    "testFail": "✗ Connection failed",
+    "getKey": "Get API key",
+    "configured": "Configured",
+    "notConfigured": "Not configured",
+    "liveModels": "Live models",
+    "loadingModels": "Loading models...",
+    "autoProvider": "Auto select"
+  },
+  "accounts": {
+    "title": "Registered Accounts",
+    "refresh": "Refresh",
+    "empty": "No accounts yet — use the 📧 Temp Signup skill",
+    "verified": "✓ Verified",
+    "unverified": "— Not verified",
+    "delete": "🗑 Delete",
+    "confirmDelete": "Delete this account permanently? The session file will be removed.",
+    "loading": "Loading...",
+    "loadError": "Failed to load accounts"
+  },
+  "archive": {
+    "title": "Task Archive",
+    "search": "Search archive...",
+    "empty": "No archived tasks yet. Successful runs are saved here automatically.",
+    "loading": "Loading...",
+    "searchEmpty": "No results",
+    "replay": "↻ Replay",
+    "delete": "🗑 Delete",
+    "confirmDelete": "Delete this task from the archive permanently?",
+    "goal": "Goal",
+    "summary": "Summary",
+    "confidence": "Confidence",
+    "success": "✅ Success",
+    "fail": "❌ Failed",
+    "extractions": "Extractions",
+    "plan": "Plan",
+    "result": "Full Result",
+    "close": "Close",
+    "loadError": "Failed to load"
+  },
+  "archiveSuggestion": {
+    "found": "Similar result found in archive",
+    "use": "Use result",
+    "dismiss": "Dismiss",
+    "score": "{{pct}}% match"
+  },
+  "attachment": {
+    "uploading": "Uploading...",
+    "remove": "Remove",
+    "uploadError": "Upload failed",
+    "dragDrop": "Drop files here"
   }
 }
