@@ -1,12 +1,135 @@
+import { useCallback, useState } from 'react';
+import { AppShell } from '@/components/layout/AppShell';
+import { ChatThread } from '@/components/chat/ChatThread';
+import { Composer } from '@/components/chat/Composer';
+import { useTaskStream } from '@/hooks/useTaskStream';
+import { useTasksStore } from '@/stores/tasksStore';
+import type { Message } from '@/lib/types';
+import { apiPost } from '@/lib/api';
+import type { ChatResponse } from '@/lib/api';
+
+// Re-export so route imports stay in one place
+export type { Message };
+
+let msgCounter = 0;
+function newId(): string {
+  return `msg-${++msgCounter}-${Date.now()}`;
+}
+
 export default function ChatPage() {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+
+  const { tasks, addTask, updateTask } = useTasksStore();
+
+  // Used ONLY for the right drawer — AgentRunCard manages its own stream connection.
+  const drawerStream = useTaskStream(activeTaskId);
+
+  const addMsg = useCallback((msg: Message) => setMessages((prev) => [...prev, msg]), []);
+
+  const handleSubmit = useCallback(
+    async (text: string, skillOverride: string | null) => {
+      if (!text || sending) return;
+
+      addMsg({ id: newId(), role: 'user', text, timestamp: Date.now() });
+      setSending(true);
+
+      try {
+        const body: Record<string, unknown> = { message: text };
+        if (skillOverride) body.force_skill = skillOverride;
+
+        const res = await apiPost<ChatResponse>('/api/chat', body);
+
+        if (res.task_id) {
+          const taskId = res.task_id;
+          setActiveTaskId(taskId);
+          addTask({
+            taskId,
+            goal: text,
+            skill: skillOverride ?? undefined,
+            status: 'running',
+            startedAt: Date.now(),
+          });
+          addMsg({
+            id: newId(),
+            role: 'assistant',
+            text,
+            taskId,
+            skillHint: skillOverride ?? undefined,
+            timestamp: Date.now(),
+          });
+        } else {
+          addMsg({
+            id: newId(),
+            role: 'assistant',
+            text: 'تم استلام طلبك.',
+            timestamp: Date.now(),
+          });
+        }
+      } catch (err) {
+        addMsg({
+          id: newId(),
+          role: 'assistant',
+          text: err instanceof Error ? err.message : 'حدث خطأ غير متوقع.',
+          timestamp: Date.now(),
+        });
+      } finally {
+        setSending(false);
+      }
+    },
+    [sending, addMsg, addTask],
+  );
+
+  const handleSuggestion = useCallback(
+    (prompt: string) => void handleSubmit(prompt, null),
+    [handleSubmit],
+  );
+
+  const handleContinue = useCallback(() => {
+    // Keep thread active — user continues typing
+  }, []);
+
+  const handleEnd = useCallback(() => {
+    if (activeTaskId) {
+      updateTask(activeTaskId, { status: 'succeeded', completedAt: Date.now() });
+    }
+    setActiveTaskId(null);
+    setMessages([]);
+  }, [activeTaskId, updateTask]);
+
+  const handleNewChat = useCallback(() => {
+    setActiveTaskId(null);
+    setMessages([]);
+  }, []);
+
+  const handleSelectTask = useCallback((taskId: string) => {
+    setActiveTaskId(taskId);
+  }, []);
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-white dark:bg-slate-950">
-      <div className="text-center">
-        <h1 className="mb-2 text-2xl font-medium text-slate-900 dark:text-slate-100">
-          WebSearchAi
-        </h1>
-        <p className="text-slate-500 dark:text-slate-400">جاري البناء…</p>
+    <AppShell
+      tasks={tasks}
+      activeTaskId={activeTaskId}
+      taskStream={drawerStream}
+      onNewChat={handleNewChat}
+      onSelectTask={handleSelectTask}
+    >
+      <div className="flex flex-col h-full">
+        <div className="flex-1 overflow-y-auto">
+          <ChatThread
+            messages={messages}
+            onChip={(t) => void handleSubmit(t, null)}
+            onSuggestion={handleSuggestion}
+            onContinue={handleContinue}
+            onEnd={handleEnd}
+          />
+        </div>
+        <Composer
+          onSubmit={(t, s) => void handleSubmit(t, s)}
+          disabled={sending}
+        />
       </div>
-    </div>
-  )
+    </AppShell>
+  );
 }

@@ -1,0 +1,71 @@
+{
+  "empty": {
+    "greeting": "مرحباً، كيف يمكنني مساعدتك اليوم؟",
+    "chips": {
+      "search": "🔍 ابحث عن شيء",
+      "explore": "🎨 حلّل موقعاً",
+      "md": "📄 اكتب تقرير MD",
+      "html": "🌐 أنشئ صفحة HTML",
+      "compare": "📊 قارن منافسين",
+      "login": "🔐 سجّل دخول"
+    }
+  },
+  "composer": {
+    "placeholder": "اكتب هدفك هنا... (/ لأوامر سريعة)",
+    "send": "إرسال",
+    "attach": "إرفاق ملف"
+  },
+  "sidebar": {
+    "newChat": "محادثة جديدة",
+    "history": "المحادثات السابقة",
+    "settings": "الإعدادات",
+    "noTasks": "لا توجد مهام سابقة"
+  },
+  "topbar": {
+    "darkMode": "الوضع الداكن",
+    "lightMode": "الوضع الفاتح",
+    "langAr": "العربية",
+    "langEn": "English",
+    "settings": "الإعدادات"
+  },
+  "skill": {
+    "detecting": "جارٍ الكشف...",
+    "override": "تغيير المهارة",
+    "auto": "تلقائي"
+  },
+  "task": {
+    "running": "جارٍ التنفيذ...",
+    "succeeded": "اكتملت بنجاح",
+    "failed": "فشلت",
+    "cancelled": "ملغاة",
+    "elapsed": "استغرقت {{sec}} ثانية"
+  },
+  "continuation": {
+    "title": "اكتملت المهمة",
+    "suggestions": "اقتراحات متابعة",
+    "continue": "متابعة",
+    "end": "إنهاء"
+  },
+  "timeline": {
+    "plan": "الخطة",
+    "step": "خطوة {{n}}",
+    "noSteps": "لا توجد خطوات بعد"
+  },
+  "drawer": {
+    "screenshot": "لقطة الشاشة الحية",
+    "timeline": "مسار التنفيذ"
+  },
+  "error": {
+    "wsDisconnected": "انقطع الاتصال",
+    "retry": "إعادة المحاولة",
+    "generic": "حدث خطأ غير متوقع"
+  },
+  "settings": {
+    "title": "الإعدادات",
+    "comingSoon": "قريباً..."
+  },
+  "artifacts": {
+    "title": "الملفات",
+    "comingSoon": "قريباً..."
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "empty": {
+    "greeting": "Hello, how can I help you today?",
+    "chips": {
+      "search": "🔍 Search for something",
+      "explore": "🎨 Analyze a website",
+      "md": "📄 Write an MD report",
+      "html": "🌐 Create an HTML page",
+      "compare": "📊 Compare competitors",
+      "login": "🔐 Log in to a site"
+    }
+  },
+  "composer": {
+    "placeholder": "Type your goal here... (/ for quick commands)",
+    "send": "Send",
+    "attach": "Attach file"
+  },
+  "sidebar": {
+    "newChat": "New Chat",
+    "history": "Previous Chats",
+    "settings": "Settings",
+    "noTasks": "No previous tasks"
+  },
+  "topbar": {
+    "darkMode": "Dark mode",
+    "lightMode": "Light mode",
+    "langAr": "العربية",
+    "langEn": "English",
+    "settings": "Settings"
+  },
+  "skill": {
+    "detecting": "Detecting...",
+    "override": "Change skill",
+    "auto": "Auto"
+  },
+  "task": {
+    "running": "Running...",
+    "succeeded": "Completed",
+    "failed": "Failed",
+    "cancelled": "Cancelled",
+    "elapsed": "Took {{sec}} seconds"
+  },
+  "continuation": {
+    "title": "Task completed",
+    "suggestions": "Follow-up suggestions",
+    "continue": "Continue",
+    "end": "End"
+  },
+  "timeline": {
+    "plan": "Plan",
+    "step": "Step {{n}}",
+    "noSteps": "No steps yet"
+  },
+  "drawer": {
+    "screenshot": "Live Screenshot",
+    "timeline": "Execution Timeline"
+  },
+  "error": {
+    "wsDisconnected": "Connection lost",
+    "retry": "Retry",
+    "generic": "An unexpected error occurred"
+  },
+  "settings": {
+    "title": "Settings",
+    "comingSoon": "Coming soon..."
+  },
+  "artifacts": {
+    "title": "Artifacts",
+    "comingSoon": "Coming soon..."
+  }
+}
