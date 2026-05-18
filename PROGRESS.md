@@ -16,11 +16,25 @@
 | **D** | Existing skill cards (10) | 11 | ✅ COMPLETE |
 | **E** | Pipeline UI | 7 | ✅ COMPLETE |
 | **F** | New skills (8) | 9 | ✅ COMPLETE |
-| **G** | Settings + attachments | 7 | ⬜ Pending |
+| **G** | Settings + attachments | 7 | ✅ COMPLETE |
 | **H** | Migration cutover | 11 | ⬜ Pending |
 | **I** | Polish | 8 | ⬜ Pending |
 
-**Overall progress: 77 / 103 tasks complete**
+**Overall progress: 84 / 103 tasks complete**
+
+> Phase G verified 2026-05-19:
+> - TSC: 0 errors (strict mode)
+> - ProvidersPanel: 8 provider cards, API key + model selector + test + save-all (GET/POST /api/providers/*)
+> - AccountsLedger: list/delete temp-signup accounts (GET/DELETE /api/accounts)
+> - ArchiveBrowser: browse+search+detail modal+replay+delete (GET/DELETE /api/archive/*)
+> - useArchiveSuggestion: debounced hook, 500ms, threshold 55%, surfaces archive matches
+> - ArchiveSuggestionBanner: amber banner shown above Composer on match with use/dismiss actions
+> - AttachmentPreview: shows upload progress / done / error chips
+> - Composer: drag-and-drop + paste + file-picker button + POST /api/uploads integration
+> - SettingsPage: three-tab layout (Providers / Accounts / Archive)
+> - ChatPage: updated onSubmit signature to pass attachments array
+> - Commit: ed20acf (11 files, 1415 insertions)
+> - Next: **'ابدأ Phase H'** for migration cutover
 
 > Phase F verified 2026-05-18:
 > - TSC: 0 errors (strict mode)
