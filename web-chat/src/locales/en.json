@@ -72,7 +72,27 @@
   },
   "artifacts": {
     "title": "Artifacts",
-    "comingSoon": "Coming soon..."
+    "comingSoon": "Coming soon...",
+    "empty": "No artifacts yet — they appear here after tasks run",
+    "loading": "Loading artifacts...",
+    "loadError": "Failed to load artifacts",
+    "refresh": "Refresh",
+    "download": "Download",
+    "preview": "Preview",
+    "close": "Close",
+    "filterAll": "All",
+    "noPreview": "No preview available for this type — download to view",
+    "kinds": {
+      "md": "Markdown",
+      "html": "HTML",
+      "code": "Code",
+      "mermaid": "Diagram",
+      "pdf": "PDF",
+      "zip": "Archive",
+      "json": "JSON",
+      "screenshot": "Screenshot",
+      "csv": "CSV Table"
+    }
   },
   "providers": {
     "title": "AI Providers",

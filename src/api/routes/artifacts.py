@@ -30,6 +30,15 @@ router = APIRouter(prefix="/api/artifacts", tags=["artifacts"])
 _REGISTRY: dict[str, Artifact] = {}
 
 
+@router.get("", response_model=list[Artifact])
+async def list_artifacts(task_id: str | None = None) -> list[Artifact]:
+    """Return all registered artifacts, optionally filtered by task_id."""
+    items = list(_REGISTRY.values())
+    if task_id:
+        items = [a for a in items if a.task_id == task_id]
+    return sorted(items, key=lambda a: a.created_at, reverse=True)
+
+
 def register_artifact(a: Artifact) -> None:
     _REGISTRY[a.artifact_id] = a
 

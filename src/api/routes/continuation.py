@@ -9,7 +9,6 @@ shows without suggestions (G18 fix).
 from __future__ import annotations
 
 import asyncio
-import json
 from typing import Any
 
 from fastapi import APIRouter
@@ -32,6 +31,68 @@ class Suggestion(BaseModel):
 
 class ContinuationResponse(BaseModel):
     suggestions: list[Suggestion] = Field(default_factory=list)
+
+
+# Fallback suggestions per skill kind (used when LLM is unavailable or slow).
+_SKILL_DEFAULTS: dict[str, list[tuple[str, str]]] = {
+    "research": [
+        ("🔍 بحث أعمق", "ابحث بتفصيل أكثر عن {goal}"),
+        ("📄 اكتب تقريراً", "اكتب تقرير ماركداون شامل عن {goal}"),
+        ("📊 قارن المنافسين", "قارن المنافسين الرئيسيين في مجال {goal}"),
+    ],
+    "explore": [
+        ("🔍 تحليل أعمق", "حلّل {goal} بشكل أعمق"),
+        ("📄 تقرير ماركداون", "اكتب تقريراً كاملاً عن تحليل {goal}"),
+        ("🏗️ استخرج مكونات الواجهة", "استخرج مكونات الواجهة من {goal}"),
+    ],
+    "md_writer": [
+        ("✏️ تحرير التقرير", "عدّل التقرير الذي كتبته عن {goal}"),
+        ("📊 أضف مخططاً", "أضف مخطط Mermaid للتقرير عن {goal}"),
+        ("🌐 حوّل إلى HTML", "حوّل التقرير عن {goal} إلى صفحة HTML"),
+    ],
+    "login": [
+        ("📧 تسجيل حساب جديد", "سجّل حساباً جديداً في {goal}"),
+        ("🔍 تصفّح الموقع", "تصفّح محتوى {goal} بعد تسجيل الدخول"),
+        ("💾 احفظ بيانات الجلسة", "احفظ جلسة تسجيل الدخول في {goal}"),
+    ],
+    "competitor_matrix": [
+        ("📊 تحليل أعمق", "حلّل {goal} بشكل أعمق"),
+        ("📄 تقرير ماركداون", "اكتب تقرير ماركداون عن نتائج مقارنة {goal}"),
+        ("🔍 ابحث عن منافس جديد", "ابحث عن منافسين جدد في مجال {goal}"),
+    ],
+    "translate": [
+        ("✏️ ترجمة معكوسة", "ترجم مرة أخرى من العربية إلى الإنجليزية: {goal}"),
+        ("📄 تقرير عن الترجمة", "اكتب تقريراً عن الفروق الثقافية في ترجمة {goal}"),
+        ("🔍 ابحث عن السياق", "ابحث عن السياق الثقافي والمصطلحات في {goal}"),
+    ],
+    "summarize": [
+        ("📄 ملخص أطول", "اكتب ملخصاً أكثر تفصيلاً عن {goal}"),
+        ("🌐 ترجم الملخص", "ترجم ملخص {goal} إلى الإنجليزية"),
+        ("📊 استخرج النقاط الرئيسية", "استخرج النقاط الرئيسية من {goal}"),
+    ],
+    "pipeline": [
+        ("🔄 تشغيل مهمة مشابهة", "أعد تشغيل {goal}"),
+        ("📄 وثّق النتائج", "اكتب تقريراً بنتائج {goal}"),
+        ("🔍 تحليل إضافي", "حلّل النتائج بشكل أعمق لـ {goal}"),
+    ],
+}
+
+_DEFAULT_SUGGESTIONS: list[tuple[str, str]] = [
+    ("🔄 مهمة مشابهة", "أعد تنفيذ {goal}"),
+    ("📄 اكتب تقريراً", "اكتب تقريراً عن {goal}"),
+    ("🔍 ابحث عن المزيد", "ابحث عن مزيد من المعلومات حول {goal}"),
+]
+
+
+def _fallback_suggestions(goal: str, skill: str) -> list[Suggestion]:
+    """Return 3 context-appropriate suggestions without calling an LLM."""
+    raw = _SKILL_DEFAULTS.get(skill, _DEFAULT_SUGGESTIONS)
+    # Trim goal to keep suggestion labels short
+    short_goal = goal[:40] + "…" if len(goal) > 40 else goal
+    return [
+        Suggestion(label_ar=label, prompt=prompt.format(goal=short_goal))
+        for label, prompt in raw[:3]
+    ]
 
 
 def _gather_context(task_or_pipeline_id: str) -> tuple[str, str, str]:
@@ -75,37 +136,38 @@ async def continuation(task_or_pipeline_id: str, locale: str = "ar") -> Continua
     if not goal and not summary:
         return ContinuationResponse(suggestions=[])
 
+    # Try LLM for richer, context-aware suggestions (2 s budget).
+    # On any failure fall back to deterministic skill-based defaults so
+    # ContinuationCard never shows an empty suggestion list.
     system = load_prompt("continuation", locale=locale)
     user = (
         f"GOAL: {goal}\n\nSUMMARY:\n{summary or '(empty)'}\n\nSKILL: {skill}"
     )
 
+    llm = None
     try:
         llm = get_provider(settings)
-    except Exception:
-        return ContinuationResponse(suggestions=[])
-
-    try:
         data: Any = await asyncio.wait_for(llm.chat_json(system, user), timeout=2.0)
-    except asyncio.TimeoutError:
-        return ContinuationResponse(suggestions=[])
+        raw = data.get("suggestions") if isinstance(data, dict) else None
+        if isinstance(raw, list):
+            cleaned: list[Suggestion] = []
+            for s in raw[:5]:
+                if not isinstance(s, dict):
+                    continue
+                label = str(s.get("label_ar") or "").strip()
+                prompt_text = str(s.get("prompt") or "").strip()
+                if label and prompt_text:
+                    cleaned.append(Suggestion(label_ar=label, prompt=prompt_text))
+            if cleaned:
+                return ContinuationResponse(suggestions=cleaned[:3])
     except Exception:
-        return ContinuationResponse(suggestions=[])
+        pass
     finally:
-        try:
-            await llm.close()
-        except Exception:
-            pass
+        if llm is not None:
+            try:
+                await llm.close()
+            except Exception:
+                pass
 
-    raw = data.get("suggestions") if isinstance(data, dict) else None
-    if not isinstance(raw, list):
-        return ContinuationResponse(suggestions=[])
-    cleaned: list[Suggestion] = []
-    for s in raw[:5]:
-        if not isinstance(s, dict):
-            continue
-        label = str(s.get("label_ar") or "").strip()
-        prompt = str(s.get("prompt") or "").strip()
-        if label and prompt:
-            cleaned.append(Suggestion(label_ar=label, prompt=prompt))
-    return ContinuationResponse(suggestions=cleaned[:3])
+    # Deterministic fallback — always returns useful suggestions.
+    return ContinuationResponse(suggestions=_fallback_suggestions(goal, skill))

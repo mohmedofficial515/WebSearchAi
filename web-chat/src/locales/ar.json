@@ -72,7 +72,27 @@
   },
   "artifacts": {
     "title": "الملفات",
-    "comingSoon": "قريباً..."
+    "comingSoon": "قريباً...",
+    "empty": "لا توجد ملفات بعد — ستظهر هنا بعد تنفيذ المهام",
+    "loading": "جارٍ تحميل الملفات...",
+    "loadError": "تعذّر تحميل الملفات",
+    "refresh": "تحديث",
+    "download": "تحميل",
+    "preview": "معاينة",
+    "close": "إغلاق",
+    "filterAll": "الكل",
+    "noPreview": "لا تتوفر معاينة لهذا النوع — حمّله للعرض",
+    "kinds": {
+      "md": "ماركداون",
+      "html": "HTML",
+      "code": "كود",
+      "mermaid": "مخطط",
+      "pdf": "PDF",
+      "zip": "مضغوط",
+      "json": "JSON",
+      "screenshot": "لقطة شاشة",
+      "csv": "جدول CSV"
+    }
   },
   "providers": {
     "title": "مزودو الذكاء الاصطناعي",
