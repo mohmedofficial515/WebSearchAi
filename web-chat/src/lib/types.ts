@@ -5,6 +5,7 @@ export interface Message {
   text: string;
   taskId?: string;
   pipelineId?: string;
+  pipelineData?: Record<string, unknown>;
   skillHint?: string;
   timestamp: number;
 }

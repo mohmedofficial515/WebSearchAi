@@ -47,7 +47,7 @@ export default function ChatPage() {
           addTask({
             taskId,
             goal: text,
-            skill: skillOverride ?? undefined,
+            skill: skillOverride ?? res.intent ?? undefined,
             status: 'running',
             startedAt: Date.now(),
           });
@@ -56,7 +56,33 @@ export default function ChatPage() {
             role: 'assistant',
             text,
             taskId,
-            skillHint: skillOverride ?? undefined,
+            skillHint: skillOverride ?? res.intent ?? undefined,
+            timestamp: Date.now(),
+          });
+        } else if (res.pipeline_id) {
+          const pipelineId = res.pipeline_id;
+          setActiveTaskId(pipelineId);
+          addTask({
+            taskId: pipelineId,
+            goal: text,
+            skill: 'pipeline',
+            status: 'running',
+            startedAt: Date.now(),
+          });
+          addMsg({
+            id: newId(),
+            role: 'assistant',
+            text,
+            pipelineId,
+            pipelineData: res.pipeline ?? null,
+            timestamp: Date.now(),
+          });
+        } else if (res.mode === 'need_params' && res.missing_params) {
+          const params = res.missing_params.join('، ');
+          addMsg({
+            id: newId(),
+            role: 'assistant',
+            text: `يحتاج الطلب معلومات إضافية: ${params}`,
             timestamp: Date.now(),
           });
         } else {

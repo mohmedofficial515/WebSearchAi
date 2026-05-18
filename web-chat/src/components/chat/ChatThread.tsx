@@ -11,6 +11,7 @@ import { SignupCard } from '@/components/skill-cards/SignupCard';
 import { TempSignupCard } from '@/components/skill-cards/TempSignupCard';
 import { CloneCard } from '@/components/skill-cards/CloneCard';
 import { SiteCloneCard } from '@/components/skill-cards/SiteCloneCard';
+import { PipelineCard } from '@/components/pipeline/PipelineCard';
 import { EmptyState } from './EmptyState';
 
 interface ChatThreadProps {
@@ -80,6 +81,20 @@ export function ChatThread({ messages, onChip, onSuggestion, onContinue, onEnd }
               role="user"
               text={msg.text}
               timestamp={msg.timestamp}
+            />
+          );
+        }
+
+        if (msg.pipelineId) {
+          return (
+            <PipelineCard
+              key={msg.id}
+              pipelineId={msg.pipelineId}
+              goal={msg.text}
+              initialPlan={msg.pipelineData}
+              onSuggestion={onSuggestion}
+              onContinue={onContinue}
+              onEnd={onEnd}
             />
           );
         }

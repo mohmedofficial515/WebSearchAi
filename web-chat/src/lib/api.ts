@@ -59,7 +59,9 @@ export interface ChatResponse {
   mode: 'single' | 'pipeline' | 'need_params' | 'approved';
   task_id?: string;
   pipeline_id?: string;
+  intent?: string;
   missing_params?: string[];
+  pipeline?: Record<string, unknown>;
 }
 
 export interface UploadResponse {

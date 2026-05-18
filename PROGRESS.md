@@ -14,13 +14,26 @@
 | **B** | Backend additions + prompt extraction | 17 | ✅ COMPLETE |
 | **C** | Core chat shell | 23 | ✅ COMPLETE |
 | **D** | Existing skill cards (10) | 11 | ✅ COMPLETE |
-| **E** | Pipeline UI | 7 | ⬜ Pending |
+| **E** | Pipeline UI | 7 | ✅ COMPLETE |
 | **F** | New skills (8) | 9 | ⬜ Pending |
 | **G** | Settings + attachments | 7 | ⬜ Pending |
 | **H** | Migration cutover | 11 | ⬜ Pending |
 | **I** | Polish | 8 | ⬜ Pending |
 
-**Overall progress: 61 / 103 tasks complete**
+**Overall progress: 68 / 103 tasks complete**
+
+> Phase E verified 2026-05-18:
+> - TSC: 0 errors (strict mode)
+> - usePipeline.ts: full pipeline WS hook (plan/step_start/step_end/paused/resumed/end events)
+> - PipelineStep.tsx: step icon + status dot + MiniStream live expand
+> - PipelineApproval.tsx: [▶ تشغيل] [✕ إلغاء] with POST to /api/pipelines/{id}/approve|cancel
+> - PipelinePausedForm.tsx: inline required_fields form → POST /api/pipelines/{id}/resume
+> - PipelineCard.tsx: full pipeline card orchestrating all pipeline sub-components
+> - ChatThread.tsx: routes pipelineId messages to PipelineCard
+> - ChatPage.tsx: handles mode=pipeline + mode=need_params from /api/chat
+> - api.ts ChatResponse: added pipeline? + intent? fields
+> - types.ts Message: added pipelineData? field
+> - Next: **'ابدأ Phase F'** to build new skill cards
 
 > Phase D verified 2026-05-18:
 > - TSC: 0 errors (strict mode)
