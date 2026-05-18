@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 import { RightDrawer } from './RightDrawer';
@@ -23,10 +23,34 @@ export function AppShell({
   children,
 }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const drawerOpen =
+  const [drawerDismissed, setDrawerDismissed] = useState(false);
+
+  const drawerShouldShow =
     taskStream.status === 'connecting' ||
     taskStream.status === 'running' ||
     !!(taskStream.screenshot);
+
+  const drawerOpen = drawerShouldShow && !drawerDismissed;
+
+  // Reset dismissed state whenever a new live stream starts
+  const prevShouldShow = useRef(drawerShouldShow);
+  useEffect(() => {
+    if (!prevShouldShow.current && drawerShouldShow) {
+      setDrawerDismissed(false);
+    }
+    prevShouldShow.current = drawerShouldShow;
+  }, [drawerShouldShow]);
+
+  // Escape = close right drawer
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && drawerOpen) {
+        setDrawerDismissed(true);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [drawerOpen]);
 
   return (
     <div className="flex h-screen overflow-hidden bg-white dark:bg-slate-950">
@@ -57,7 +81,15 @@ export function AppShell({
 
       {/* Right drawer — live execution panel */}
       {drawerOpen && (
-        <div className="flex-shrink-0 w-[360px] hidden lg:block border-s border-slate-100 dark:border-slate-800">
+        <div className="flex-shrink-0 w-[360px] hidden lg:flex flex-col border-s border-slate-100 dark:border-slate-800">
+          {/* Dismiss button */}
+          <button
+            onClick={() => setDrawerDismissed(true)}
+            aria-label="إغلاق اللوحة"
+            className="absolute end-2 top-2 z-10 w-6 h-6 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs transition-colors"
+          >
+            ✕
+          </button>
           <RightDrawer taskStream={taskStream} />
         </div>
       )}

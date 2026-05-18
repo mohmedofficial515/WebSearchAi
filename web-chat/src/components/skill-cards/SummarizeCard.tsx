@@ -80,7 +80,7 @@ export function SummarizeCard({ taskId, goal, onSuggestion, onContinue, onEnd }:
                   <span>📊</span>
                   <span>
                     {originalWords?.toLocaleString('ar')} كلمة → {summaryWords?.toLocaleString('ar')} كلمة
-                    <span className="text-emerald-600 dark:text-emerald-400 mr-1"> (تقليص {ratio}%)</span>
+                    <span className="text-emerald-600 dark:text-emerald-400 ms-1"> (تقليص {ratio}%)</span>
                   </span>
                 </div>
               )}

@@ -53,7 +53,7 @@ export function PipelinePausedForm({ pipelineId, stepId, fields, onResumed }: Pi
           <div key={field.name} className="flex flex-col gap-1">
             <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
               {field.label_ar}
-              {field.required && <span className="text-rose-500 mr-0.5">*</span>}
+              {field.required && <span className="text-rose-500 ms-0.5">*</span>}
             </label>
             <input
               type={field.type === 'password' ? 'password' : field.type === 'email' ? 'email' : 'text'}

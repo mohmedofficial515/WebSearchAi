@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type DragEvent, type KeyboardEvent } from 'react';
+import { forwardRef, useCallback, useImperativeHandle, useRef, useState, type DragEvent, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SkillBadge } from './SkillBadge';
 import { AttachmentPreview, type AttachmentEntry } from './AttachmentPreview';
@@ -13,10 +13,17 @@ interface ComposerProps {
   disabled?: boolean;
 }
 
+export interface ComposerHandle {
+  focus: () => void;
+}
+
 let attachCounter = 0;
 function newAttachId() { return `att-${++attachCounter}`; }
 
-export function Composer({ onSubmit, disabled = false }: ComposerProps) {
+export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer(
+  { onSubmit, disabled = false },
+  ref,
+) {
   const { t } = useTranslation();
   const [text, setText] = useState('');
   const [skillOverride, setSkillOverride] = useState<string | null>(null);
@@ -26,6 +33,10 @@ export function Composer({ onSubmit, disabled = false }: ComposerProps) {
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    focus: () => { textareaRef.current?.focus(); },
+  }));
 
   const intentResult = useIntent(text);
   const archiveSuggestion = useArchiveSuggestion(text);
@@ -256,4 +267,4 @@ export function Composer({ onSubmit, disabled = false }: ComposerProps) {
       />
     </div>
   );
-}
+});

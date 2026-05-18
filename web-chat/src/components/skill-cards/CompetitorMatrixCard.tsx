@@ -120,7 +120,7 @@ export function CompetitorMatrixCard({ taskId, goal, onSuggestion, onContinue, o
                 <thead>
                   <tr className="border-b border-slate-200 dark:border-slate-700">
                     <th
-                      className="text-right px-3 py-2 font-medium text-slate-600 dark:text-slate-400 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 select-none whitespace-nowrap"
+                      className="text-start px-3 py-2 font-medium text-slate-600 dark:text-slate-400 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 select-none whitespace-nowrap"
                       onClick={() => handleSort('competitor')}
                     >
                       المنافس {sortCol === 'competitor' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
@@ -128,7 +128,7 @@ export function CompetitorMatrixCard({ taskId, goal, onSuggestion, onContinue, o
                     {features.map((f) => (
                       <th
                         key={f}
-                        className="text-right px-3 py-2 font-medium text-slate-600 dark:text-slate-400 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 select-none whitespace-nowrap"
+                        className="text-start px-3 py-2 font-medium text-slate-600 dark:text-slate-400 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 select-none whitespace-nowrap"
                         onClick={() => handleSort(f)}
                       >
                         {f} {sortCol === f ? (sortDir === 'asc' ? '↑' : '↓') : ''}

@@ -1,7 +1,7 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppShell } from '@/components/layout/AppShell';
 import { ChatThread } from '@/components/chat/ChatThread';
-import { Composer } from '@/components/chat/Composer';
+import { Composer, type ComposerHandle } from '@/components/chat/Composer';
 import { useTaskStream } from '@/hooks/useTaskStream';
 import { useTasksStore } from '@/stores/tasksStore';
 import type { Message } from '@/lib/types';
@@ -22,7 +22,21 @@ export default function ChatPage() {
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
 
+  const composerRef = useRef<ComposerHandle>(null);
   const { tasks, addTask, updateTask } = useTasksStore();
+
+  // "/" key focuses Composer when not already in an input/textarea
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName;
+      if (e.key === '/' && tag !== 'INPUT' && tag !== 'TEXTAREA' && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        composerRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   // Used ONLY for the right drawer — AgentRunCard manages its own stream connection.
   const drawerStream = useTaskStream(activeTaskId);
@@ -158,6 +172,7 @@ export default function ChatPage() {
           />
         </div>
         <Composer
+          ref={composerRef}
           onSubmit={(txt, s, atts) => void handleSubmit(txt, s, atts)}
           disabled={sending}
         />
