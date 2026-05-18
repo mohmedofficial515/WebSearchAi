@@ -54,6 +54,11 @@ app.include_router(auth_router)
 if (WEB_DIR / "static").exists():
     app.mount("/static", StaticFiles(directory=str(WEB_DIR / "static")), name="static")
 
+# React chat SPA — served at /chat (built to web/static/chat/)
+_CHAT_DIR = WEB_DIR / "static" / "chat"
+if _CHAT_DIR.exists():
+    app.mount("/chat", StaticFiles(directory=str(_CHAT_DIR), html=True), name="chat")
+
 if (settings.output_path).exists():
     app.mount(
         "/artifacts",

@@ -1,0 +1,52 @@
+/* Fonts must come before @tailwind directives */
+@import '@fontsource/tajawal/300.css';
+@import '@fontsource/tajawal/400.css';
+@import '@fontsource/tajawal/500.css';
+@import '@fontsource/tajawal/700.css';
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/500.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-arabic: 'Tajawal', sans-serif;
+    --font-sans: 'Inter', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  html {
+    font-family: var(--font-arabic);
+    direction: rtl;
+  }
+
+  :lang(en) {
+    font-family: var(--font-sans);
+  }
+
+  code, pre, kbd {
+    font-family: var(--font-mono);
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: theme('colors.slate.200') transparent;
+  }
+
+  .dark * {
+    scrollbar-color: theme('colors.slate.700') transparent;
+  }
+}
+
+@layer utilities {
+  .chat-column {
+    max-width: theme('maxWidth.chat');
+    margin-inline: auto;
+    padding-inline: theme('spacing.6');
+  }
+}
