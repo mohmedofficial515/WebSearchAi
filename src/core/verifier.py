@@ -4,28 +4,17 @@ from __future__ import annotations
 
 from typing import Any
 
+from .prompt_loader import load_prompt
 
-SYSTEM_VERIFIER = """You are the verifier of a browser-using AI agent.
 
-Given:
-- the original GOAL
-- the SUCCESS CRITERIA the planner committed to
-- the agent's FINAL SUMMARY
-- EXTRACTED DATA collected during the run (treat this as primary evidence)
-- the FINAL PAGE SNAPSHOT (URL, title, visible elements — may be empty for raw JSON pages)
-
-Rules:
-- EXTRACTED DATA is the most important signal. If it contains the requested information, mark success=true.
-- The final page snapshot may be empty or minimal (e.g. a raw JSON page) — this is NOT a failure signal.
-- Only mark success=false if the goal was clearly NOT achieved.
-
-Return JSON: {"success": true|false, "confidence": 0-1, "reason": "...", "missing": [..]}
-"""
+def _system_verifier(locale: str = "ar") -> str:
+    return load_prompt("verifier", locale=locale)
 
 
 class Verifier:
-    def __init__(self, llm: Any) -> None:
+    def __init__(self, llm: Any, *, locale: str = "ar") -> None:
         self.llm = llm
+        self.locale = locale
 
     async def verify(
         self,
@@ -43,4 +32,4 @@ class Verifier:
             f"AGENT FINAL SUMMARY:\n{final_summary}\n\n"
             f"FINAL PAGE SNAPSHOT:\n{final_snapshot_text}\n"
         )
-        return await self.llm.chat_json(SYSTEM_VERIFIER, user)
+        return await self.llm.chat_json(_system_verifier(self.locale), user)
