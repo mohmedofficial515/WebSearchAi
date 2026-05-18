@@ -14,69 +14,23 @@ from __future__ import annotations
 from dataclasses import dataclass, asdict
 from typing import Any
 
-
-# ── Prompt templates ─────────────────────────────────────────────────────────
-
-_RANK_SYSTEM = """You score web-search candidates against a user GOAL.
-
-For each candidate, judge:
-- relevance: does title+snippet match the goal? (0-10)
-- authority: is the domain likely authoritative for this query? (0-10)
-- reason: one short sentence (in the goal's language) explaining the score.
-
-Reply with JSON ONLY in this exact shape:
-{"scores":[{"index":<int>,"relevance":<0-10>,"authority":<0-10>,"reason":"<short>"}]}
-
-Cover EVERY candidate. No prose outside the JSON."""
+from .prompt_loader import load_prompt
 
 
-_CONTENT_SYSTEM = """You judge whether a fetched WEB PAGE answers the user's GOAL.
-
-You receive:
-- GOAL: what the user wants
-- URL: where the content came from
-- CONTENT: extracted text from the page (may be truncated)
-
-Score 0..1 where:
-  1.00 = directly and completely answers the goal
-  0.70 = strong relevant info, minor gaps
-  0.40 = related but does not actually answer
-  0.10 = off-topic / login wall / empty / error page
-
-Also identify "missing_info" — what (if anything) is still needed.
-
-Reply with JSON ONLY:
-{"score": <0..1>, "verdict": "<one short sentence in goal's language>", "missing_info": "<or empty string>", "useful_facts": ["<bullet>", "..."]}"""
+def _rank_system(locale: str = "ar") -> str:
+    return load_prompt("critic", locale=locale, section="rank")
 
 
-_QUERY_SYSTEM = """You generate diverse web-search queries for a research GOAL.
-
-Rules:
-- 3 to 5 queries.
-- Preserve the language of the goal. Arabic stays Arabic. NEVER invent transliterations of brand names.
-- Cover different angles: literal, synonym/paraphrase, brand-canonical name, locale-specific.
-- First query MUST be the user's literal goal (cleaned up).
-- Each query is a short string a search engine would accept (no leading verbs like "search for").
-
-Reply with JSON ONLY:
-{"queries": ["<q1>", "<q2>", "..."]}"""
+def _content_system(locale: str = "ar") -> str:
+    return load_prompt("critic", locale=locale, section="content")
 
 
-_RESEARCH_SYSTEM = """You decide whether the agent should run ANOTHER round of web search.
+def _query_system(locale: str = "ar") -> str:
+    return load_prompt("critic", locale=locale, section="queries")
 
-Inputs:
-- GOAL
-- QUERIES already tried
-- URLS already visited
-- USEFUL_FACTS gathered so far
-- WHY_NOT (notes on what failed / was irrelevant)
 
-If the agent has enough to answer the goal → should_re_search=false, with a brief reason.
-If not, propose a NEW STRATEGY (different angle, broader/narrower terms, different language)
-and 2-3 new queries that AVOID the angles already tried.
-
-Reply with JSON ONLY:
-{"should_re_search": <bool>, "reason": "<short>", "new_strategy": "<short or empty>", "new_queries": ["<q1>", "..."]}"""
+def _research_system(locale: str = "ar") -> str:
+    return load_prompt("critic", locale=locale, section="re_search")
 
 
 # ── Dataclasses ──────────────────────────────────────────────────────────────
@@ -132,15 +86,16 @@ class Critic:
     Search-first must NOT fail because a tiny scoring call hiccupped.
     """
 
-    def __init__(self, llm: Any) -> None:
+    def __init__(self, llm: Any, *, locale: str = "ar") -> None:
         self._llm = llm
+        self.locale = locale
 
     # ── Query generation ───────────────────────────────────────────────────
 
     async def generate_queries(self, goal: str, max_queries: int = 5) -> list[str]:
         user = f"GOAL: {goal}\n\nProduce up to {max_queries} queries."
         try:
-            data = await self._llm.chat_json(_QUERY_SYSTEM, user)
+            data = await self._llm.chat_json(_query_system(self.locale), user)
             queries = data.get("queries") if isinstance(data, dict) else None
             if isinstance(queries, list):
                 clean = [str(q).strip() for q in queries if str(q).strip()]
@@ -187,7 +142,7 @@ class Critic:
             lines.append(f"[{idx}] {title}\n    {url}\n    {snippet}")
         user = f"GOAL: {goal}\n\nCANDIDATES:\n" + "\n\n".join(lines)
         try:
-            data = await self._llm.chat_json(_RANK_SYSTEM, user)
+            data = await self._llm.chat_json(_rank_system(self.locale), user)
             raw = data.get("scores") if isinstance(data, dict) else None
             if isinstance(raw, list):
                 out: list[ResultScore] = []
@@ -232,7 +187,7 @@ class Critic:
         snippet = content.strip()[:6000]
         user = f"GOAL: {goal}\n\nURL: {url}\n\nCONTENT:\n{snippet}"
         try:
-            data = await self._llm.chat_json(_CONTENT_SYSTEM, user)
+            data = await self._llm.chat_json(_content_system(self.locale), user)
             if isinstance(data, dict):
                 facts = data.get("useful_facts") or []
                 if not isinstance(facts, list):
@@ -271,7 +226,7 @@ class Critic:
             f"WHY_NOT (failures / irrelevance notes):\n{why_not or '(none)'}"
         )
         try:
-            data = await self._llm.chat_json(_RESEARCH_SYSTEM, user)
+            data = await self._llm.chat_json(_research_system(self.locale), user)
             if isinstance(data, dict):
                 qs = data.get("new_queries") or []
                 if not isinstance(qs, list):
