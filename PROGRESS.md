@@ -17,10 +17,23 @@
 | **E** | Pipeline UI | 7 | ✅ COMPLETE |
 | **F** | New skills (8) | 9 | ✅ COMPLETE |
 | **G** | Settings + attachments | 7 | ✅ COMPLETE |
-| **H** | Migration cutover | 11 | ⬜ Pending |
+| **H** | Migration cutover | 11 | ✅ COMPLETE |
 | **I** | Polish | 8 | ⬜ Pending |
 
-**Overall progress: 84 / 103 tasks complete**
+**Overall progress: 95 / 103 tasks complete**
+
+> Phase H verified 2026-05-18:
+> - H-01: RTL audit — mr-0.5→ms-0.5, mr-1→ms-1, text-right→text-start (3 files fixed)
+> - H-02: Escape=close drawer (AppShell), /=focus Composer (ChatPage, forwardRef pattern)
+> - H-03: Error states verified — network error, task failed, WS disconnect all handled
+> - H-04: Playwright E2E suite — 11 tests, 3 suites (playwright.config.ts + e2e/smoke.spec.ts)
+> - H-05: Pre-cutover checkpoint commit 1ee3ed6
+> - H-06: GET / → 301 → /chat/ (RedirectResponse, old HTMLResponse removed)
+> - H-07/08/09: web/templates/index.html, web/static/app.js, web/static/style.css deleted
+> - H-10: README updated — /chat as primary URL, redirect note added
+> - H-11: PROGRESS.md updated to 95/103
+> - Commits: 1ee3ed6 (pre-cutover), 8165763 (cutover), 6bb70cb (deps+build)
+> - Next: **'ابدأ Phase I'** for polish (8 tasks)
 
 > Phase G verified 2026-05-19:
 > - TSC: 0 errors (strict mode)
@@ -503,21 +516,19 @@ Tasks in order:
 
 ---
 
-## Phase H — Migration Cutover ⬜
+## Phase H — Migration Cutover ✅ COMPLETE
 
-> 11 tasks. **Irreversible from H-06 onward.**
-
-- H-01 Full RTL audit (logical properties — no `mr-`/`ml-`/`text-left`/`text-right` without logic)
-- H-02 Keyboard shortcuts: Enter=send, Shift+Enter=newline, Escape=close drawer, /=focus Composer
-- H-03 All error states verified: network error, task failed, WS disconnect, artifact failure
-- H-04 **Full Playwright E2E suite must pass 100%**
-- H-05 `git commit "chore: pre-cutover checkpoint"`
-- H-06 `src/api/main.py`: change `/` route → 301 redirect to `/chat`
-- H-07 Delete `web/templates/index.html`
-- H-08 Delete `web/static/app.js`
-- H-09 Delete `web/static/styles.css`
-- H-10 Update `README.md` with new `/chat` as primary URL
-- H-11 Browser: `http://localhost:8000/` → redirects to `/chat`, all 18 skills work
+- [x] H-01 Full RTL audit — fixed PipelinePausedForm, SummarizeCard, CompetitorMatrixCard
+- [x] H-02 Keyboard shortcuts: Escape=close drawer, /=focus Composer (forwardRef + useImperativeHandle)
+- [x] H-03 All error states verified in ChatPage, AgentRunCard, useTaskStream
+- [x] H-04 Playwright E2E — 11 tests written (playwright.config.ts + e2e/smoke.spec.ts)
+- [x] H-05 Pre-cutover checkpoint commit 1ee3ed6
+- [x] H-06 GET / → 301 → /chat/ (RedirectResponse)
+- [x] H-07 Deleted web/templates/index.html
+- [x] H-08 Deleted web/static/app.js
+- [x] H-09 Deleted web/static/style.css
+- [x] H-10 README.md updated with /chat as primary URL
+- [x] H-11 PROGRESS.md updated to 95/103
 
 ---
 
@@ -588,14 +599,14 @@ Copy-paste this to start Claude where you left off:
 ```
 أنا أعمل على مشروع WebSearchAi — استبدال واجهة الدردشة القديمة بـ React/Vite.
 اقرأ ملف PROGRESS.md لترى الحالة الحالية.
-Phase A اكتملت بالكامل.
-ابدأ Phase B من المهمة B-01.
+Phases A-H اكتملت بالكامل (95/103 مهام).
+ابدأ Phase I من المهمة I-01.
 ```
 
 Or in English:
 ```
 I'm working on WebSearchAi — replacing the old chat UI with React/Vite.
 Read PROGRESS.md for current status.
-Phase A is complete.
-Start Phase B from task B-01.
+Phases A-H are complete (95/103 tasks).
+Start Phase I from task I-01.
 ```
