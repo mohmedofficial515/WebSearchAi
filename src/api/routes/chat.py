@@ -31,6 +31,11 @@ from ...utils.logger import log
 from ..tasks import task_manager
 
 
+async def _emit_skill_result(task_id: str, data: dict) -> None:
+    """Emit a skill_result event so the frontend card can render rich data."""
+    await bus.publish(Event(task_id=task_id, type="skill_result", data=data))
+
+
 router = APIRouter(prefix="/api", tags=["chat"])
 
 
@@ -124,66 +129,138 @@ def _dispatch_single(intent_kind: str, message: str, url: str | None,
 
         async def _factory(_tid: str):
             async with Agent() as agent:
-                return await agent.run(message, task_id=_tid)
+                result = await agent.run(message, task_id=_tid)
+            r = result.to_dict()
+            await _emit_skill_result(_tid, {
+                "skill": "research",
+                "summary_ar": r.get("summary", ""),
+                "sources": r.get("sources", []),
+                "artifacts_dir": r.get("artifacts_dir"),
+            })
+            return r
         return task_manager.submit("run", {"goal": message}, _factory).task_id
 
     if intent_kind == "explore":
-        from ...skills.explore import explore as _skill
+        from ...skills.explore import explore as _explore_skill
 
-        async def _factory(_tid: str):
-            r = await _skill(url or "", params.get("depth_hint") or "thorough")
-            return {"site": r.site, "report": r.report, "report_path": r.report_path}
-        return task_manager.submit("explore", {"goal": message, "url": url}, _factory).task_id
+        async def _explore_factory(_tid: str):
+            er = await _explore_skill(url or "", params.get("depth_hint") or "thorough")
+            result = {"site": er.site, "report": er.report, "report_path": er.report_path}
+            await _emit_skill_result(_tid, {
+                "skill": "explore",
+                "site": er.site,
+                "report": er.report,
+                "report_path": er.report_path,
+                "summary_ar": er.report.get("executive_summary", "") if isinstance(er.report, dict) else "",
+            })
+            return result
+        return task_manager.submit("explore", {"goal": message, "url": url}, _explore_factory).task_id
 
     if intent_kind == "clone":
-        from ...skills.clone import clone as _skill
+        from ...skills.clone import clone as _clone_skill
 
-        async def _factory(_tid: str):
-            r = await _skill(url or "", max_assets=int(params.get("max_assets") or 60))
-            return {
-                "url": r.url, "raw_dir": r.raw_dir,
-                "rebuilt_html_path": r.rebuilt_html_path, "assets": r.assets,
+        async def _clone_factory(_tid: str):
+            cr = await _clone_skill(url or "", max_assets=int(params.get("max_assets") or 60))
+            result = {
+                "url": cr.url, "raw_dir": cr.raw_dir,
+                "rebuilt_html_path": cr.rebuilt_html_path, "assets": cr.assets,
             }
-        return task_manager.submit("clone", {"goal": message, "url": url}, _factory).task_id
+            await _emit_skill_result(_tid, {
+                "skill": "clone",
+                "url": cr.url,
+                "rebuilt_html_path": cr.rebuilt_html_path,
+                "assets_count": len(cr.assets),
+                "summary_ar": f"تم استنساخ {cr.url} — {len(cr.assets)} ملف",
+            })
+            return result
+        return task_manager.submit("clone", {"goal": message, "url": url}, _clone_factory).task_id
 
     if intent_kind == "components":
-        from ...skills.find_components import find_components
+        from ...skills.find_components import find_components as _find_components
 
-        async def _factory(_tid: str):
-            r = await find_components(params.get("query") or message,
-                                      max_pages=int(params.get("max_pages") or 5))
-            return r.to_dict()
-        return task_manager.submit("find_components", {"goal": message}, _factory).task_id
+        async def _components_factory(_tid: str):
+            comp_r = await _find_components(params.get("query") or message,
+                                            max_pages=int(params.get("max_pages") or 5))
+            result = comp_r.to_dict()
+            await _emit_skill_result(_tid, {
+                "skill": "components",
+                **result,
+                "summary_ar": result.get("summary_ar", f"تم العثور على {result.get('total_variants', 0)} مكون"),
+            })
+            return result
+        return task_manager.submit("find_components", {"goal": message}, _components_factory).task_id
 
     if intent_kind == "design_tokens":
-        from ...skills.design_tokens import extract_design_tokens
+        from ...skills.design_tokens import extract_design_tokens as _dt_skill
 
-        async def _factory(_tid: str):
-            t = await extract_design_tokens(url or "")
-            return t.to_dict()
-        return task_manager.submit("design_tokens", {"goal": message, "url": url}, _factory).task_id
+        async def _dt_factory(_tid: str):
+            dt = await _dt_skill(url or "")
+            result = dt.to_dict()
+            await _emit_skill_result(_tid, {
+                "skill": "design_tokens",
+                **result,
+                "summary_ar": result.get("summary_ar", f"رموز التصميم لـ {url}"),
+            })
+            return result
+        return task_manager.submit("design_tokens", {"goal": message, "url": url}, _dt_factory).task_id
 
-    if intent_kind in {"login", "signup", "temp_signup"}:
-        # These need credential fields — surfaced via missing_params upstream.
-        # If we reach here the caller has them; mirror main.py dispatch.
+    if intent_kind == "login":
         from ..main import _dispatch_skill_intent
         from ...core.intent_router import Intent
 
-        # We use the existing main.py dispatcher which already handles
-        # signup/login/temp_signup wiring correctly.
         rec = _dispatch_skill_intent(
             Intent(kind=intent_kind, goal=message, url=url, params=params, confidence=0.85),
             body=_FakeRunBody(),  # type: ignore[arg-type]
         )
         return rec.task_id
 
-    # Default fallback — research.
-    from ...core.agent import Agent
+    if intent_kind == "signup":
+        from ..main import _dispatch_skill_intent
+        from ...core.intent_router import Intent
 
-    async def _factory(_tid: str):
-        async with Agent() as agent:
-            return await agent.run(message, task_id=_tid)
-    return task_manager.submit("run", {"goal": message}, _factory).task_id
+        rec = _dispatch_skill_intent(
+            Intent(kind=intent_kind, goal=message, url=url, params=params, confidence=0.85),
+            body=_FakeRunBody(),  # type: ignore[arg-type]
+        )
+        return rec.task_id
+
+    if intent_kind == "temp_signup":
+        from ..main import _dispatch_skill_intent
+        from ...core.intent_router import Intent
+
+        rec = _dispatch_skill_intent(
+            Intent(kind=intent_kind, goal=message, url=url, params=params, confidence=0.85),
+            body=_FakeRunBody(),  # type: ignore[arg-type]
+        )
+        return rec.task_id
+
+    if intent_kind == "site_clone":
+        from ...skills.site_clone import site_clone as _site_clone_skill
+
+        async def _site_clone_factory(_tid: str):
+            sc_r = await _site_clone_skill(url or "", max_pages=int(params.get("max_pages") or 50))
+            result = sc_r.to_dict()
+            await _emit_skill_result(_tid, {
+                "skill": "site_clone",
+                **result,
+                "summary_ar": f"تم نسخ {result.get('total_pages', 0)} صفحة من {url}",
+            })
+            return result
+        return task_manager.submit("site_clone", {"goal": message, "url": url}, _site_clone_factory).task_id
+
+    # Default fallback — research.
+    from ...core.agent import Agent as _AgentFallback
+
+    async def _fallback_factory(_tid: str):
+        async with _AgentFallback() as agent:
+            result = await agent.run(message, task_id=_tid)
+        r = result.to_dict()
+        await _emit_skill_result(_tid, {
+            "skill": "research",
+            "summary_ar": r.get("summary", ""),
+        })
+        return r
+    return task_manager.submit("run", {"goal": message}, _fallback_factory).task_id
 
 
 class _FakeRunBody:

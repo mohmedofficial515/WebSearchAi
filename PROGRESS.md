@@ -13,14 +13,23 @@
 | **A** | Scaffolding | 10 | ✅ COMPLETE |
 | **B** | Backend additions + prompt extraction | 17 | ✅ COMPLETE |
 | **C** | Core chat shell | 23 | ✅ COMPLETE |
-| **D** | Existing skill cards (10) | 11 | ⬜ Pending |
+| **D** | Existing skill cards (10) | 11 | ✅ COMPLETE |
 | **E** | Pipeline UI | 7 | ⬜ Pending |
 | **F** | New skills (8) | 9 | ⬜ Pending |
 | **G** | Settings + attachments | 7 | ⬜ Pending |
 | **H** | Migration cutover | 11 | ⬜ Pending |
 | **I** | Polish | 8 | ⬜ Pending |
 
-**Overall progress: 50 / 103 tasks complete**
+**Overall progress: 61 / 103 tasks complete**
+
+> Phase D verified 2026-05-18:
+> - TSC: 0 errors (strict mode)
+> - 9 new skill card components: SearchResultCard, ExploreReportCard, DesignTokensCard,
+>   ComponentsGalleryCard, LoginCard, SignupCard, TempSignupCard, CloneCard, SiteCloneCard
+> - useTaskStream extended: skillResult field + status event handler + task_end normalization
+> - ChatThread now routes to correct card by skill prop (switch on 10 skill types)
+> - chat.py updated: _emit_skill_result after each skill completes
+> - Next: **'ابدأ Phase E'** to build Pipeline UI
 
 > Phase C verified 2026-05-18:
 > - TSC: 0 errors (strict mode + noUnusedLocals/Params)

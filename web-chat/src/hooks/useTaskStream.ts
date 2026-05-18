@@ -26,6 +26,7 @@ export interface TaskStreamState {
   sources: Source[];
   artifacts: ArtifactMeta[];
   continuationSuggestions: ContinuationSuggestion[];
+  skillResult: Record<string, unknown> | null;
   error: string | null;
   elapsedSec: number | null;
 }
@@ -38,6 +39,7 @@ type Action =
   | { type: 'STEP_UPDATE_LAST'; patch: Partial<TimelineStep> }
   | { type: 'SOURCES'; sources: Source[] }
   | { type: 'SUGGESTIONS'; suggestions: ContinuationSuggestion[] }
+  | { type: 'SKILL_RESULT'; data: Record<string, unknown> }
   | { type: 'DONE'; verdict: string; summaryAr: string; elapsedSec: number | null; status: 'succeeded' | 'failed' }
   | { type: 'ERROR'; message: string }
   | { type: 'RESET' };
@@ -52,6 +54,7 @@ const INITIAL: TaskStreamState = {
   sources: [],
   artifacts: [],
   continuationSuggestions: [],
+  skillResult: null,
   error: null,
   elapsedSec: null,
 };
@@ -76,6 +79,8 @@ function reducer(state: TaskStreamState, action: Action): TaskStreamState {
       return { ...state, sources: action.sources };
     case 'SUGGESTIONS':
       return { ...state, continuationSuggestions: action.suggestions };
+    case 'SKILL_RESULT':
+      return { ...state, skillResult: action.data };
     case 'DONE':
       return {
         ...state,
@@ -134,17 +139,57 @@ export function useTaskStream(taskId: string | null): TaskStreamState {
         dispatch({ type: 'SOURCES', sources: ev.data.sources });
         break;
 
-      case 'task_end':
+      case 'skill_result':
+        dispatch({ type: 'SKILL_RESULT', data: ev.data });
+        break;
+
+      case 'task_end': {
+        // Backend emits either `verdict: str` (new) or `success: bool` (legacy agent)
+        const verdict =
+          typeof ev.data.verdict === 'string'
+            ? ev.data.verdict
+            : (ev.data as unknown as Record<string, unknown>).success
+            ? 'success'
+            : 'failure';
+        const summaryAr =
+          (ev.data as unknown as Record<string, unknown>).summary_ar as string ??
+          ev.data.summary ??
+          '';
         doneRef.current = true;
         dispatch({
           type: 'DONE',
-          verdict: ev.data.verdict,
-          summaryAr: ev.data.summary ?? '',
+          verdict,
+          summaryAr,
           elapsedSec: ev.data.elapsed_sec ?? null,
-          status: ev.data.verdict !== 'failure' ? 'succeeded' : 'failed',
+          status: verdict !== 'failure' ? 'succeeded' : 'failed',
         });
         wsRef.current?.close();
         break;
+      }
+
+      case 'status': {
+        // Emitted by task_manager at the very end — acts as fallback task_end
+        // for skills that don't go through Agent (design_tokens, site_clone, etc.)
+        if (doneRef.current) break;
+        const s = ev.data.status;
+        if (s === 'succeeded' || s === 'failed' || s === 'cancelled') {
+          doneRef.current = true;
+          const result = ev.data.result;
+          const summaryAr =
+            (result?.summary_ar as string | undefined) ??
+            (result?.summary as string | undefined) ??
+            '';
+          dispatch({
+            type: 'DONE',
+            verdict: s === 'succeeded' ? 'success' : 'failure',
+            summaryAr,
+            elapsedSec: null,
+            status: s === 'succeeded' ? 'succeeded' : 'failed',
+          });
+          wsRef.current?.close();
+        }
+        break;
+      }
 
       case 'completion_prompt':
         dispatch({ type: 'SUGGESTIONS', suggestions: ev.data.suggestions });

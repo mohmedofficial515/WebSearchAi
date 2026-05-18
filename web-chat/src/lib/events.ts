@@ -6,6 +6,8 @@ export type WsEventType =
   | 'decision'
   | 'action_result'
   | 'task_end'
+  | 'status'
+  | 'skill_result'
   | 'research_round'
   | 'candidate_selected'
   | 'content_critiqued'
@@ -202,6 +204,22 @@ export interface WsErrorEvent extends WsBaseEvent {
   data: { message: string };
 }
 
+// skill_result — emitted after each skill finishes, carries structured result
+export interface SkillResultEvent extends WsBaseEvent {
+  type: 'skill_result';
+  data: Record<string, unknown>;
+}
+
+// status — emitted by task_manager on task completion (succeeded/failed/cancelled)
+export interface StatusEvent extends WsBaseEvent {
+  type: 'status';
+  data: {
+    status: 'running' | 'succeeded' | 'failed' | 'cancelled';
+    error?: string | null;
+    result?: Record<string, unknown> | null;
+  };
+}
+
 export type WsEvent =
   | PerceptionEvent
   | PlanEvent
@@ -220,4 +238,6 @@ export type WsEvent =
   | PipelineResumedEvent
   | PipelineEndEvent
   | CompletionPromptEvent
-  | WsErrorEvent;
+  | WsErrorEvent
+  | SkillResultEvent
+  | StatusEvent;
