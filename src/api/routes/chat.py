@@ -248,6 +248,135 @@ def _dispatch_single(intent_kind: str, message: str, url: str | None,
             return result
         return task_manager.submit("site_clone", {"goal": message, "url": url}, _site_clone_factory).task_id
 
+    if intent_kind == "md_writer":
+        from ...skills.md_writer import md_writer as _md_writer_skill
+
+        async def _md_writer_factory(_tid: str):
+            r = await _md_writer_skill(message)
+            result = {"content": r.content, "filename": r.filename, "path": r.path, "word_count": r.word_count}
+            await _emit_skill_result(_tid, {
+                "skill": "md_writer",
+                **result,
+                "summary_ar": f"تم كتابة وثيقة Markdown ({r.word_count} كلمة)",
+            })
+            return result
+        return task_manager.submit("md_writer", {"goal": message}, _md_writer_factory).task_id
+
+    if intent_kind == "html_artifact":
+        from ...skills.html_artifact import html_artifact as _html_skill
+
+        async def _html_factory(_tid: str):
+            r = await _html_skill(message)
+            result = {"content": r.content, "filename": r.filename, "path": r.path}
+            await _emit_skill_result(_tid, {
+                "skill": "html_artifact",
+                **result,
+                "summary_ar": f"تم إنشاء صفحة HTML: {r.filename}",
+            })
+            return result
+        return task_manager.submit("html_artifact", {"goal": message}, _html_factory).task_id
+
+    if intent_kind == "code_artifact":
+        from ...skills.code_artifact import code_artifact as _code_skill
+
+        async def _code_factory(_tid: str):
+            r = await _code_skill(message, params.get("language") or "")
+            result = {"content": r.content, "language": r.language, "filename": r.filename, "path": r.path}
+            await _emit_skill_result(_tid, {
+                "skill": "code_artifact",
+                **result,
+                "summary_ar": f"تم توليد كود {r.language}: {r.filename}",
+            })
+            return result
+        return task_manager.submit("code_artifact", {"goal": message}, _code_factory).task_id
+
+    if intent_kind == "mermaid_diagram":
+        from ...skills.mermaid_diagram import mermaid_diagram as _mermaid_skill
+
+        async def _mermaid_factory(_tid: str):
+            r = await _mermaid_skill(message)
+            result = {"content": r.content, "diagram_type": r.diagram_type, "filename": r.filename, "path": r.path}
+            await _emit_skill_result(_tid, {
+                "skill": "mermaid_diagram",
+                **result,
+                "summary_ar": f"تم رسم مخطط {r.diagram_type}",
+            })
+            return result
+        return task_manager.submit("mermaid_diagram", {"goal": message}, _mermaid_factory).task_id
+
+    if intent_kind == "pdf_export":
+        # PDF is rendered client-side; backend generates the markdown content
+        from ...skills.md_writer import md_writer as _pdf_md_skill
+
+        async def _pdf_factory(_tid: str):
+            r = await _pdf_md_skill(message)
+            result = {"content": r.content, "filename": r.filename, "path": r.path, "word_count": r.word_count}
+            await _emit_skill_result(_tid, {
+                "skill": "pdf_export",
+                **result,
+                "summary_ar": f"المحتوى جاهز للتصدير كـ PDF ({r.word_count} كلمة)",
+            })
+            return result
+        return task_manager.submit("pdf_export", {"goal": message}, _pdf_factory).task_id
+
+    if intent_kind == "summarize":
+        from ...skills.summarize import summarize as _summarize_skill
+
+        async def _summarize_factory(_tid: str):
+            r = await _summarize_skill(message, goal=message)
+            result = {
+                "summary_ar": r.summary_ar,
+                "bullets": r.bullets,
+                "original_word_count": r.original_word_count,
+                "summary_word_count": r.summary_word_count,
+            }
+            await _emit_skill_result(_tid, {
+                "skill": "summarize",
+                **result,
+            })
+            return result
+        return task_manager.submit("summarize", {"goal": message}, _summarize_factory).task_id
+
+    if intent_kind == "translate":
+        from ...skills.translate import translate as _translate_skill
+
+        async def _translate_factory(_tid: str):
+            r = await _translate_skill(message, target_lang=params.get("target_lang") or "")
+            result = {
+                "original": r.original,
+                "translated": r.translated,
+                "source_lang": r.source_lang,
+                "target_lang": r.target_lang,
+            }
+            await _emit_skill_result(_tid, {
+                "skill": "translate",
+                **result,
+                "summary_ar": f"ترجمة من {r.source_lang} إلى {r.target_lang}",
+            })
+            return result
+        return task_manager.submit("translate", {"goal": message}, _translate_factory).task_id
+
+    if intent_kind == "competitor_matrix":
+        from ...skills.competitor_matrix import competitor_matrix as _matrix_skill
+
+        async def _matrix_factory(_tid: str):
+            r = await _matrix_skill(message)
+            result = {
+                "competitors": r.competitors,
+                "features": r.features,
+                "matrix": r.matrix,
+                "csv_content": r.csv_content,
+                "filename": r.filename,
+                "path": r.path,
+            }
+            await _emit_skill_result(_tid, {
+                "skill": "competitor_matrix",
+                **result,
+                "summary_ar": f"مصفوفة مقارنة {len(r.competitors)} منافس × {len(r.features)} معيار",
+            })
+            return result
+        return task_manager.submit("competitor_matrix", {"goal": message}, _matrix_factory).task_id
+
     # Default fallback — research.
     from ...core.agent import Agent as _AgentFallback
 

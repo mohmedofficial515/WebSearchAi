@@ -15,12 +15,27 @@
 | **C** | Core chat shell | 23 | ✅ COMPLETE |
 | **D** | Existing skill cards (10) | 11 | ✅ COMPLETE |
 | **E** | Pipeline UI | 7 | ✅ COMPLETE |
-| **F** | New skills (8) | 9 | ⬜ Pending |
+| **F** | New skills (8) | 9 | ✅ COMPLETE |
 | **G** | Settings + attachments | 7 | ⬜ Pending |
 | **H** | Migration cutover | 11 | ⬜ Pending |
 | **I** | Polish | 8 | ⬜ Pending |
 
-**Overall progress: 68 / 103 tasks complete**
+**Overall progress: 77 / 103 tasks complete**
+
+> Phase F verified 2026-05-18:
+> - TSC: 0 errors (strict mode)
+> - Backend skills: md_writer, html_artifact, code_artifact, mermaid_diagram, summarize, translate, competitor_matrix
+> - pdf_export reuses md_writer backend + client-side print-to-PDF
+> - chat.py _dispatch_single: 8 new skill handlers added
+> - Frontend cards: MarkdownArtifactCard (react-markdown+GFM+KaTeX), HtmlArtifactCard (iframe CSP sandbox)
+> - CodeArtifactCard (shiki highlighting + copy + download)
+> - MermaidArtifactCard (mermaid.js SVG render + download SVG)
+> - PdfArtifactCard (rendered markdown + browser print dialog)
+> - SummarizeCard (Arabic summary + bullets + word-count delta %)
+> - TranslateCard (side-by-side RTL/LTR bilingual layout)
+> - CompetitorMatrixCard (sortable/filterable table + CSV BOM download)
+> - ChatThread.tsx: routes 8 new skills by name
+> - Next: **'ابدأ Phase G'** to build Settings + attachments
 
 > Phase E verified 2026-05-18:
 > - TSC: 0 errors (strict mode)

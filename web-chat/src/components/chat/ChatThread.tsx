@@ -11,6 +11,14 @@ import { SignupCard } from '@/components/skill-cards/SignupCard';
 import { TempSignupCard } from '@/components/skill-cards/TempSignupCard';
 import { CloneCard } from '@/components/skill-cards/CloneCard';
 import { SiteCloneCard } from '@/components/skill-cards/SiteCloneCard';
+import { MarkdownArtifactCard } from '@/components/skill-cards/MarkdownArtifactCard';
+import { HtmlArtifactCard } from '@/components/skill-cards/HtmlArtifactCard';
+import { CodeArtifactCard } from '@/components/skill-cards/CodeArtifactCard';
+import { MermaidArtifactCard } from '@/components/skill-cards/MermaidArtifactCard';
+import { PdfArtifactCard } from '@/components/skill-cards/PdfArtifactCard';
+import { SummarizeCard } from '@/components/skill-cards/SummarizeCard';
+import { TranslateCard } from '@/components/skill-cards/TranslateCard';
+import { CompetitorMatrixCard } from '@/components/skill-cards/CompetitorMatrixCard';
 import { PipelineCard } from '@/components/pipeline/PipelineCard';
 import { EmptyState } from './EmptyState';
 
@@ -55,6 +63,22 @@ function SkillCard({ taskId, goal, skill, onSuggestion, onContinue, onEnd }: Ski
       return <CloneCard {...props} />;
     case 'site_clone':
       return <SiteCloneCard {...props} />;
+    case 'md_writer':
+      return <MarkdownArtifactCard {...props} />;
+    case 'html_artifact':
+      return <HtmlArtifactCard {...props} />;
+    case 'code_artifact':
+      return <CodeArtifactCard {...props} />;
+    case 'mermaid_diagram':
+      return <MermaidArtifactCard {...props} />;
+    case 'pdf_export':
+      return <PdfArtifactCard {...props} />;
+    case 'summarize':
+      return <SummarizeCard {...props} />;
+    case 'translate':
+      return <TranslateCard {...props} />;
+    case 'competitor_matrix':
+      return <CompetitorMatrixCard {...props} />;
     default:
       return <AgentRunCard {...props} skill={skill} />;
   }
