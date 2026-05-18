@@ -12,7 +12,7 @@
 |---|---|---|---|
 | **A** | Scaffolding | 10 | ✅ COMPLETE |
 | **B** | Backend additions + prompt extraction | 17 | ✅ COMPLETE |
-| **C** | Core chat shell | 23 | ⬜ Pending |
+| **C** | Core chat shell | 23 | ✅ COMPLETE |
 | **D** | Existing skill cards (10) | 11 | ⬜ Pending |
 | **E** | Pipeline UI | 7 | ⬜ Pending |
 | **F** | New skills (8) | 9 | ⬜ Pending |
@@ -20,7 +20,13 @@
 | **H** | Migration cutover | 11 | ⬜ Pending |
 | **I** | Polish | 8 | ⬜ Pending |
 
-**Overall progress: 27 / 103 tasks complete**
+**Overall progress: 50 / 103 tasks complete**
+
+> Phase C verified 2026-05-18:
+> - TSC: 0 errors (strict mode + noUnusedLocals/Params)
+> - Dev server: http://localhost:5174/chat/ returns React app (dir=rtl, lang=ar)
+> - 32 files, 2057 insertions — commit 00b079a
+> - Next: **'ابدأ Phase D'** to build the 10 skill cards
 
 > Phase B verified 2026-05-18:
 > - 12 new endpoints all return non-404 on live server (verified on :8011)
