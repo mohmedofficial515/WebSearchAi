@@ -31,9 +31,9 @@ outputs/
 *.log
 
 # DBs / local state
-*.sqlite
-*.sqlite-journal
+# *.sqlite
+# *.sqlite-journal
 
-Playwright
+# Playwright
 # playwright-report/
 # test-results/
