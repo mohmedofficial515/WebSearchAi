@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 import { RightDrawer } from './RightDrawer';
@@ -80,19 +81,27 @@ export function AppShell({
       </div>
 
       {/* Right drawer — live execution panel */}
-      {drawerOpen && (
-        <div className="flex-shrink-0 w-[360px] hidden lg:flex flex-col border-s border-slate-100 dark:border-slate-800">
-          {/* Dismiss button */}
-          <button
-            onClick={() => setDrawerDismissed(true)}
-            aria-label="إغلاق اللوحة"
-            className="absolute end-2 top-2 z-10 w-6 h-6 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs transition-colors"
+      <AnimatePresence>
+        {drawerOpen && (
+          <motion.div
+            key="right-drawer"
+            className="flex-shrink-0 w-[360px] hidden lg:flex flex-col border-s border-slate-100 dark:border-slate-800 relative"
+            initial={{ x: 40, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: 40, opacity: 0 }}
+            transition={{ duration: 0.22, ease: 'easeOut' }}
           >
-            ✕
-          </button>
-          <RightDrawer taskStream={taskStream} />
-        </div>
-      )}
+            <button
+              onClick={() => setDrawerDismissed(true)}
+              aria-label="إغلاق اللوحة"
+              className="absolute end-2 top-2 z-10 w-6 h-6 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs transition-colors"
+            >
+              ✕
+            </button>
+            <RightDrawer taskStream={taskStream} />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

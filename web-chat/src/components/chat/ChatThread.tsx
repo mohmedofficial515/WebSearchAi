@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import type { Message } from '@/lib/types';
 import { MessageBubble } from './MessageBubble';
 import { AgentRunCard } from '@/components/skill-cards/AgentRunCard';
@@ -21,6 +22,12 @@ import { TranslateCard } from '@/components/skill-cards/TranslateCard';
 import { CompetitorMatrixCard } from '@/components/skill-cards/CompetitorMatrixCard';
 import { PipelineCard } from '@/components/pipeline/PipelineCard';
 import { EmptyState } from './EmptyState';
+
+const msgVariants = {
+  hidden: { opacity: 0, y: 14 },
+  show:   { opacity: 1, y: 0, transition: { duration: 0.22, ease: 'easeOut' } },
+  exit:   { opacity: 0, transition: { duration: 0.12 } },
+};
 
 interface ChatThreadProps {
   messages: Message[];
@@ -97,55 +104,53 @@ export function ChatThread({ messages, onChip, onSuggestion, onContinue, onEnd }
 
   return (
     <div className="chat-column py-6 space-y-4">
-      {messages.map((msg) => {
-        if (msg.role === 'user') {
-          return (
-            <MessageBubble
-              key={msg.id}
-              role="user"
-              text={msg.text}
-              timestamp={msg.timestamp}
-            />
-          );
-        }
+      <AnimatePresence initial={false}>
+        {messages.map((msg) => {
+          if (msg.role === 'user') {
+            return (
+              <motion.div key={msg.id} variants={msgVariants} initial="hidden" animate="show" exit="exit">
+                <MessageBubble role="user" text={msg.text} timestamp={msg.timestamp} />
+              </motion.div>
+            );
+          }
 
-        if (msg.pipelineId) {
-          return (
-            <PipelineCard
-              key={msg.id}
-              pipelineId={msg.pipelineId}
-              goal={msg.text}
-              initialPlan={msg.pipelineData}
-              onSuggestion={onSuggestion}
-              onContinue={onContinue}
-              onEnd={onEnd}
-            />
-          );
-        }
+          if (msg.pipelineId) {
+            return (
+              <motion.div key={msg.id} variants={msgVariants} initial="hidden" animate="show" exit="exit">
+                <PipelineCard
+                  pipelineId={msg.pipelineId}
+                  goal={msg.text}
+                  initialPlan={msg.pipelineData}
+                  onSuggestion={onSuggestion}
+                  onContinue={onContinue}
+                  onEnd={onEnd}
+                />
+              </motion.div>
+            );
+          }
 
-        if (msg.taskId) {
-          return (
-            <SkillCard
-              key={msg.id}
-              taskId={msg.taskId}
-              goal={msg.text}
-              skill={msg.skillHint}
-              onSuggestion={onSuggestion}
-              onContinue={onContinue}
-              onEnd={onEnd}
-            />
-          );
-        }
+          if (msg.taskId) {
+            return (
+              <motion.div key={msg.id} variants={msgVariants} initial="hidden" animate="show" exit="exit">
+                <SkillCard
+                  taskId={msg.taskId}
+                  goal={msg.text}
+                  skill={msg.skillHint}
+                  onSuggestion={onSuggestion}
+                  onContinue={onContinue}
+                  onEnd={onEnd}
+                />
+              </motion.div>
+            );
+          }
 
-        return (
-          <MessageBubble
-            key={msg.id}
-            role="assistant"
-            text={msg.text}
-            timestamp={msg.timestamp}
-          />
-        );
-      })}
+          return (
+            <motion.div key={msg.id} variants={msgVariants} initial="hidden" animate="show" exit="exit">
+              <MessageBubble role="assistant" text={msg.text} timestamp={msg.timestamp} />
+            </motion.div>
+          );
+        })}
+      </AnimatePresence>
       <div ref={bottomRef} />
     </div>
   );
