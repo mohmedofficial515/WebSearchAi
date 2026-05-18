@@ -36,6 +36,12 @@ from ..skills.login import login as skill_login
 from ..skills.signup import signup as skill_signup
 from ..utils.event_bus import bus
 from .auth import router as auth_router
+from .routes.artifacts import router as artifacts_router
+from .routes.chat import router as chat_router
+from .routes.continuation import router as continuation_router
+from .routes.intent import router as intent_router
+from .routes.pipelines import router as pipelines_router
+from .routes.uploads import router as uploads_router
 from .tasks import task_manager
 
 
@@ -50,6 +56,12 @@ app = FastAPI(
 )
 
 app.include_router(auth_router)
+app.include_router(intent_router)
+app.include_router(chat_router)
+app.include_router(uploads_router)
+app.include_router(artifacts_router)
+app.include_router(continuation_router)
+app.include_router(pipelines_router)
 
 if (WEB_DIR / "static").exists():
     app.mount("/static", StaticFiles(directory=str(WEB_DIR / "static")), name="static")
