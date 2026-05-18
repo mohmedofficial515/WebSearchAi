@@ -1,0 +1,44 @@
+# docker-compose.yml — single-container dev deployment
+# Use:  docker compose up -d
+#       docker compose logs -f app
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: websearchai:latest
+    container_name: websearchai
+    ports:
+      - "${API_PORT:-8000}:8000"
+    env_file:
+      - .env
+    environment:
+      # Override .env values for the container
+      API_HOST: "0.0.0.0"
+      BROWSER_HEADLESS: "true"
+      OUTPUT_DIR: /app/outputs
+    volumes:
+      # Persist outputs (screenshots, reports, memory.db) across restarts
+      - ./outputs:/app/outputs
+      # Optional: bind-mount source for dev hot-reload
+      # - ./src:/app/src
+    restart: unless-stopped
+    shm_size: 2gb  # Chromium needs this
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # Uncomment when Phase 6 lands and we move to a real task queue
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: websearchai-redis
+  #   volumes:
+  #     - redis-data:/data
+  #   restart: unless-stopped
+
+# volumes:
+#   redis-data:
