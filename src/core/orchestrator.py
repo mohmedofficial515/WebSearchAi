@@ -30,6 +30,13 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, AsyncGenerator, Awaitable, Callable
 
+from .pipeline_events import (
+    PIPELINE_END,
+    PIPELINE_PAUSED,
+    PIPELINE_PLAN,
+    PIPELINE_STEP_END,
+    PIPELINE_STEP_START,
+)
 from .prompt_loader import load_prompt
 
 
@@ -263,7 +270,7 @@ class Orchestrator:
         user_inputs = user_inputs or {}
         results: dict[str, Any] = {}
 
-        yield {"type": "pipeline_plan", "data": pipeline.to_dict()}
+        yield {"type": PIPELINE_PLAN, "data": pipeline.to_dict()}
 
         for step in pipeline.steps:
             # Merge any user-supplied inputs for this step.
@@ -274,7 +281,7 @@ class Orchestrator:
             if missing:
                 step.status = "paused"
                 yield {
-                    "type": "pipeline_paused",
+                    "type": PIPELINE_PAUSED,
                     "data": {
                         "pipeline_id": pipeline.pipeline_id,
                         "step_id": step.step_id,
@@ -287,7 +294,7 @@ class Orchestrator:
 
             step.status = "running"
             yield {
-                "type": "pipeline_step_start",
+                "type": PIPELINE_STEP_START,
                 "data": {
                     "pipeline_id": pipeline.pipeline_id,
                     "step_id": step.step_id,
@@ -306,7 +313,7 @@ class Orchestrator:
                 step.result = step_result
                 results[step.step_id] = step_result
                 yield {
-                    "type": "pipeline_step_end",
+                    "type": PIPELINE_STEP_END,
                     "data": {
                         "pipeline_id": pipeline.pipeline_id,
                         "step_id": step.step_id,
@@ -318,7 +325,7 @@ class Orchestrator:
                 step.status = "failed"
                 step.error = f"{type(exc).__name__}: {exc}"
                 yield {
-                    "type": "pipeline_step_end",
+                    "type": PIPELINE_STEP_END,
                     "data": {
                         "pipeline_id": pipeline.pipeline_id,
                         "step_id": step.step_id,
@@ -327,7 +334,7 @@ class Orchestrator:
                     },
                 }
                 yield {
-                    "type": "pipeline_end",
+                    "type": PIPELINE_END,
                     "data": {
                         "pipeline_id": pipeline.pipeline_id,
                         "ok": False,
@@ -337,7 +344,7 @@ class Orchestrator:
                 return
 
         yield {
-            "type": "pipeline_end",
+            "type": PIPELINE_END,
             "data": {
                 "pipeline_id": pipeline.pipeline_id,
                 "ok": True,
