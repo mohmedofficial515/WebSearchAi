@@ -1,3 +1,5 @@
+import { memo } from 'react';
+
 interface MessageBubbleProps {
   role: 'user' | 'assistant';
   text: string;
@@ -8,7 +10,7 @@ function formatTime(ts: number): string {
   return new Date(ts).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
 }
 
-export function MessageBubble({ role, text, timestamp }: MessageBubbleProps) {
+export const MessageBubble = memo(function MessageBubble({ role, text, timestamp }: MessageBubbleProps) {
   if (role === 'user') {
     return (
       <div className="flex justify-start">
@@ -32,4 +34,4 @@ export function MessageBubble({ role, text, timestamp }: MessageBubbleProps) {
       </div>
     </div>
   );
-}
+});

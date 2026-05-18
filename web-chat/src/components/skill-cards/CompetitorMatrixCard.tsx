@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useTaskStream } from '@/hooks/useTaskStream';
 import { ContinuationCard } from '@/components/chat/ContinuationCard';
@@ -38,18 +38,16 @@ export function CompetitorMatrixCard({ taskId, goal, onSuggestion, onContinue, o
     }
   }, [sortCol]);
 
-  const filteredMatrix = matrix.filter((row) => {
-    if (!filter) return true;
-    return Object.values(row).some((v) => String(v).includes(filter));
-  });
-
-  const sortedMatrix = [...filteredMatrix].sort((a, b) => {
-    if (!sortCol) return 0;
-    const av = String(a[sortCol] ?? '');
-    const bv = String(b[sortCol] ?? '');
-    const cmp = av.localeCompare(bv, 'ar');
-    return sortDir === 'asc' ? cmp : -cmp;
-  });
+  const sortedMatrix = useMemo(() => {
+    const filtered = filter
+      ? matrix.filter((row) => Object.values(row).some((v) => String(v).includes(filter)))
+      : matrix;
+    if (!sortCol) return filtered;
+    return [...filtered].sort((a, b) => {
+      const cmp = String(a[sortCol] ?? '').localeCompare(String(b[sortCol] ?? ''), 'ar');
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+  }, [matrix, filter, sortCol, sortDir]);
 
   const handleDownloadCsv = useCallback(() => {
     if (!csvContent || !filename) return;

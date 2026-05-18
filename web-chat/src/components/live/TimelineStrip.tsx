@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TimelineStep } from '@/hooks/useTaskStream';
 import type { PlanStep } from '@/lib/events';
@@ -8,7 +9,7 @@ interface TimelineStripProps {
   plan: PlanStep[] | null;
 }
 
-export function TimelineStrip({ steps, plan }: TimelineStripProps) {
+export const TimelineStrip = memo(function TimelineStrip({ steps, plan }: TimelineStripProps) {
   const { t } = useTranslation();
 
   if (steps.length === 0 && !plan) {
@@ -58,4 +59,4 @@ export function TimelineStrip({ steps, plan }: TimelineStripProps) {
       ))}
     </div>
   );
-}
+});

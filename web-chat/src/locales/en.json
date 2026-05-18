@@ -31,7 +31,8 @@
   "skill": {
     "detecting": "Detecting...",
     "override": "Change skill",
-    "auto": "Auto"
+    "auto": "Auto",
+    "clearOverride": "Reset to auto-detect"
   },
   "task": {
     "running": "Running...",

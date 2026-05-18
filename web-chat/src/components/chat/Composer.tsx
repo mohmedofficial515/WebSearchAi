@@ -200,6 +200,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
             {skillOverride && (
               <button
                 onClick={() => setSkillOverride(null)}
+                aria-label={t('skill.clearOverride')}
                 className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
               >
                 ✕ {t('skill.auto')}

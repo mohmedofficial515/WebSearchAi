@@ -113,6 +113,8 @@ export function PipelineStep({ step, index, isLast }: PipelineStepProps) {
             {canExpand && (
               <button
                 onClick={() => setExpanded((v) => !v)}
+                aria-label={expanded ? 'إخفاء التفاصيل' : 'عرض التفاصيل'}
+                aria-expanded={expanded}
                 className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 shrink-0"
               >
                 {expanded ? '▲' : '▼'}
