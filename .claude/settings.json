@@ -118,7 +118,8 @@
       "Bash(curl -s http://localhost:8001/chat/)",
       "Bash(kill %1)",
       "Bash(git -C \"f:/tools/my ai/WebSearchAi\" ls-files --others --ignored --exclude-standard web-chat/)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(gh auth *)"
     ]
   }
 }
