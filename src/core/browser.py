@@ -135,12 +135,23 @@ class BrowserSession:
         self._browser = None  # persistent contexts don't expose a Browser
 
         self._context.set_default_timeout(settings.browser_timeout)
+
+        # Block notification/geolocation permission prompts — these are
+        # browser-level dialogs that appear outside the DOM and cause click
+        # timeouts when the agent tries to interact with elements behind them.
+        await self._context.grant_permissions([])
+
         # Reuse the about:blank page that launch_persistent_context opens,
         # otherwise we leave a dangling tab.
         if self._context.pages:
             self.page = self._context.pages[0]
         else:
             self.page = await self._context.new_page()
+
+        # Auto-dismiss any JS alert/confirm/prompt dialogs.
+        # Without this, a page that calls window.alert() or shows a
+        # beforeunload dialog will freeze the agent loop forever.
+        self.page.on("dialog", lambda d: d.dismiss())
 
         log.info(
             f"🌐 patchright started "
@@ -231,3 +242,74 @@ class BrowserSession:
     async def eval_js(self, script: str) -> Any:
         assert self.page
         return await self.page.evaluate(script)
+
+    async def dismiss_overlay(self) -> dict[str, Any]:
+        """Best-effort overlay / modal / cookie-banner dismissal.
+
+        Tries, in order:
+          1. Common close-button selectors (aria-label close/dismiss,
+             Bootstrap data-dismiss, .modal-close, .btn-close).
+          2. Cookie-consent affirmation buttons (Accept / موافق / قبول).
+             Clicking "agree" makes the banner go away without leaving
+             us with a half-modal still blocking the DOM.
+          3. Generic ×/✕/إغلاق/رفض text buttons.
+          4. Keyboard Escape (soft fallback).
+
+        Each click is bounded to a 2-second timeout so a stale selector
+        match doesn't burn 30 seconds. Returns {"ok": bool, "via": str};
+        never raises — caller treats failure as "still blocked".
+        """
+        assert self.page
+        selectors: list[tuple[str, str]] = [
+            # ── ARIA close / dismiss ───────────────────────────────
+            ('button[aria-label*="close" i]', "aria-close"),
+            ('button[aria-label*="dismiss" i]', "aria-dismiss"),
+            ('[role="button"][aria-label*="close" i]', "role-close"),
+            ('button[aria-label*="إغلاق"]', "aria-close-ar"),
+            ('button[aria-label*="اغلاق"]', "aria-close-ar2"),
+            # ── Bootstrap / common close classes ───────────────────
+            ('button[data-dismiss="modal"]', "bs-dismiss"),
+            ('button[data-bs-dismiss="modal"]', "bs5-dismiss"),
+            ('button.modal-close, .modal__close, .modal-close-button', "modal-close-class"),
+            ('button.close, .btn-close', "close-class"),
+            # ── Cookie-banner affirmations ─────────────────────────
+            ('button:has-text("Accept all")', "cookie-accept-en"),
+            ('button:has-text("Accept All")', "cookie-accept-en2"),
+            ('button:has-text("I agree")', "cookie-agree-en"),
+            ('button:has-text("Got it")', "cookie-gotit-en"),
+            ('button:has-text("موافق")', "cookie-agree-ar"),
+            ('button:has-text("أوافق")', "cookie-agree-ar2"),
+            ('button:has-text("قبول")', "cookie-accept-ar"),
+            ('button:has-text("بإستمرارك")', "cookie-continue-ar"),
+            # ── Generic close-text buttons ─────────────────────────
+            ('button:has-text("إغلاق")', "txt-close-ar"),
+            ('button:has-text("رفض")', "txt-reject-ar"),
+            ('button:has-text("لا شكراً")', "txt-no-thanks-ar"),
+            ('button:has-text("لا شكرا")', "txt-no-thanks-ar2"),
+            ('button:has-text("لاحقاً")', "txt-later-ar"),
+            ('button:has-text("لاحقا")', "txt-later-ar2"),
+            ('button:has-text("تخطي")', "txt-skip-ar"),
+            ('button:has-text("×")', "txt-x"),
+            ('button:has-text("✕")', "txt-x2"),
+            ('[role="button"]:has-text("×")', "role-x"),
+            ('a:has-text("×")', "link-x"),
+        ]
+        for sel, label in selectors:
+            try:
+                loc = self.page.locator(sel)
+                if await loc.count() == 0:
+                    continue
+                # Short timeout — if not actually clickable, move on
+                # instead of hanging for 30s on a stale match.
+                await loc.first.click(timeout=2000)
+                await random_delay(200, 500)
+                log.info(f"   ↳ overlay dismissed via {label} ({sel})")
+                return {"ok": True, "via": label}
+            except Exception:
+                continue
+        try:
+            await self.page.keyboard.press("Escape")
+            await random_delay(150, 350)
+        except Exception:
+            pass
+        return {"ok": False, "via": "escape-fallback"}

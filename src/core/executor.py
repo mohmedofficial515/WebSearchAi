@@ -35,8 +35,24 @@ class Executor:
             elif action == "click":
                 idx = action_dict.get("index")
                 sel = action_dict.get("selector") or (Perception.selector_for_index(idx) if idx is not None else "")
-                await self._s.click(sel)
-                return ActionResult(ok=True, action=action, note=f"clicked {sel}")
+                try:
+                    await self._s.click(sel)
+                    return ActionResult(ok=True, action=action, note=f"clicked {sel}")
+                except Exception as click_exc:
+                    # Auto-recovery: timeout/intercept usually means an
+                    # overlay is in the way. Try dismissing once and retry
+                    # the click before bubbling the error up. Saves the
+                    # agent from burning steps re-clicking a blocked target.
+                    msg = str(click_exc)
+                    if "Timeout" in msg or "intercept" in msg:
+                        dismiss = await self._s.dismiss_overlay()
+                        if dismiss.get("ok"):
+                            await self._s.click(sel)
+                            return ActionResult(
+                                ok=True, action=action,
+                                note=f"clicked {sel} (auto-dismissed overlay via {dismiss.get('via')})",
+                            )
+                    raise
 
             elif action == "type":
                 idx = action_dict.get("index")
@@ -57,7 +73,14 @@ class Executor:
                 return ActionResult(ok=True, action=action, note=f"scrolled {direction}")
 
             elif action == "wait":
-                ms = action_dict.get("ms", 1000)
+                # Planner schema uses "seconds"; older callers may pass "ms".
+                # Accept both so the LLM doesn't get a silent 1-second default
+                # when it asks for {"seconds": 5}.
+                if "seconds" in action_dict:
+                    ms = int(float(action_dict.get("seconds") or 1) * 1000)
+                else:
+                    ms = int(action_dict.get("ms") or 1000)
+                ms = max(0, min(ms, 15_000))  # hard-cap at 15s to prevent stalls
                 await asyncio.sleep(ms / 1000)
                 return ActionResult(ok=True, action=action, note=f"waited {ms}ms")
 
@@ -65,6 +88,24 @@ class Executor:
                 raw = await self._s.eval_js("document.body.innerText")
                 text = str(raw or "")[:4000]
                 return ActionResult(ok=True, action=action, note=text, extracted=text)
+
+            # ── Overlay dismissal (smart) ────────────────────────────────
+            # Tries 20+ common selectors (close buttons, cookie banners,
+            # Bootstrap data-dismiss) and falls back to Escape. Returns a
+            # clear note so the LLM knows whether to retry or change tactic.
+            elif action == "dismiss_overlay":
+                res = await self._s.dismiss_overlay()
+                ok = bool(res.get("ok"))
+                via = res.get("via", "?")
+                if ok:
+                    note = f"overlay dismissed via {via}"
+                else:
+                    note = (
+                        f"overlay still present after trying {via}. Next: try clicking a "
+                        "specific close-button candidate from the snapshot, reload the page "
+                        "with goto, or emit fail if the overlay is undismissable."
+                    )
+                return ActionResult(ok=ok, action=action, note=note)
 
             # ── Search (API, not browser) ────────────────────────────────
             # Prefer this over scraping Bing/Google: the agent gets clean

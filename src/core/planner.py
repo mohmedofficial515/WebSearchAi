@@ -65,6 +65,7 @@ Allowed actions (return EXACTLY ONE per step):
 - {"action":"scroll","direction":"down|up","amount":600}
 - {"action":"wait","seconds":2}
 - {"action":"extract","what":"<what to remember>"}
+- {"action":"dismiss_overlay"}                # AUTO: closes modals / cookie banners / popups blocking the page
 - {"action":"open_tab","url":"https://..."}   # open a new browser tab
 - {"action":"switch_tab","tab_id":"tab_1"}    # switch to a tab by id
 - {"action":"close_tab","tab_id":"tab_1"}     # close a tab
@@ -96,12 +97,33 @@ LANGUAGE — keep queries in the language of the GOAL:
   know the canonical English spelling, use that — otherwise keep
   the Arabic verbatim.
 
+OVERLAY / MODAL / COOKIE-BANNER HANDLING (do this FIRST when present):
+- If the SNAPSHOT starts with "⚠️  OVERLAY/MODAL DETECTED", the entire
+  page underneath is BLOCKED. Clear the overlay BEFORE anything else.
+- REQUIRED action order:
+    1. Emit {{"action":"dismiss_overlay"}} — handles 95% of cases
+       automatically (close buttons, cookie banners, Escape fallback).
+       Do this FIRST, every time.
+    2. If dismiss_overlay reports failure, the snapshot will list
+       explicit CLOSE-BUTTON CANDIDATES with indices — click one of
+       those: {{"action":"click","index":<from candidates>}}.
+    3. If no candidates exist either, reload the page:
+       {{"action":"goto","url":"<current url>"}}. Some overlays do
+       not reappear after a fresh load.
+    4. After 3 failed dismissal attempts, emit
+       {{"action":"fail","reason":"undismissable overlay"}}.
+- NEVER press Escape more than ONCE. If Escape didn't work the first
+  time, it won't work the second. Switch strategy immediately.
+- NEVER click a page element while the overlay flag is set — each
+  blocked click burns a 30-second timeout.
+
 ANTI-LOOP / GIVE-UP rules — these prevent burning steps:
-- Look at the recent ACTION HISTORY. If your last 3 actions are
-  essentially the same (same action type + same/very-similar query
-  or URL), STOP repeating. Either pick a fundamentally different
-  approach (different domain, different language, different angle)
-  or emit {{"action":"fail","reason":"..."}}.
+- Look at the recent ACTION HISTORY. If your last 2-3 actions are
+  essentially the same (same action type + same/very-similar query,
+  URL, OR key — e.g. press Escape twice), STOP repeating. Either pick
+  a fundamentally different approach (different domain, different
+  language, different angle, different action type) or emit
+  {{"action":"fail","reason":"..."}}.
 - If a "goto" failed for a URL with a CONNECTION error
   (ERR_CONNECTION_TIMED_OUT, ERR_NAME_NOT_RESOLVED, ERR_CONNECTION_REFUSED),
   the site is unreachable from this network. Do NOT retry that

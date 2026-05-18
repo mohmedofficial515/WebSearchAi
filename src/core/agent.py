@@ -103,6 +103,12 @@ def _signature(decision: dict) -> str:
         return f"click:{decision.get('index')}"
     if a == "type":
         return f"type:{decision.get('index')}:{_normalize_query(str(decision.get('text') or ''))[:40]}"
+    if a == "press":
+        # Include the key so 'press Escape' x40 actually collapses to
+        # the same signature and trips the anti-loop guard.
+        return f"press:{(decision.get('key') or '').strip()}"
+    if a == "dismiss_overlay":
+        return "dismiss_overlay"
     if a in {"scroll", "wait"}:
         return f"{a}:{decision.get('direction') or decision.get('seconds') or decision.get('ms') or ''}"
     return a or "unknown"
@@ -305,21 +311,43 @@ class Agent:
                     )
                     log.warning(f"⚠️ {blocked_note}")
 
-            # 3+ identical signatures → force a change of approach.
-            elif _sig_counts[sig] >= 3 and decision.get("action") in {
-                "search_web", "click", "type", "scroll"
-            }:
+            # Repeated identical signatures → force a change of approach.
+            # Press has a lower threshold (2) because pressing the same key
+            # twice when nothing changed is already a clear loop signal —
+            # the 40x Escape spam on overlay-blocked pages was the canary.
+            elif decision.get("action") in {
+                "search_web", "click", "type", "scroll", "press", "dismiss_overlay"
+            } and _sig_counts[sig] >= (2 if decision.get("action") == "press" else 3):
                 blocked_note = (
-                    f"BLOCKED: same action signature repeated "
+                    f"BLOCKED: same action signature ({sig!r}) repeated "
                     f"{_sig_counts[sig]}x — forcing strategy change."
                 )
-                _loop_hint = (
-                    "You have repeated the SAME action 3+ times with no new "
-                    "result. STOP refining the same query/click. Either pick "
-                    "a fundamentally different approach (different URL from "
-                    "your search results, different query angle, different "
-                    "language) OR emit fail with a clear reason."
-                )
+                if decision.get("action") == "press":
+                    _loop_hint = (
+                        f"You pressed the same key ({decision.get('key')}) "
+                        "twice and nothing changed. STOP pressing it. If an "
+                        "overlay is on screen, emit "
+                        '{"action":"dismiss_overlay"} or click an explicit '
+                        "close-button candidate listed in the snapshot. "
+                        "Otherwise pick a different action entirely."
+                    )
+                elif decision.get("action") == "dismiss_overlay":
+                    _loop_hint = (
+                        "dismiss_overlay has failed multiple times. The "
+                        "overlay is not handled by common selectors. Try "
+                        "clicking a specific close-button candidate by "
+                        "index, reload the page with goto, or emit fail "
+                        "with reason 'undismissable overlay'."
+                    )
+                else:
+                    _loop_hint = (
+                        "You have repeated the SAME action 3+ times with no "
+                        "new result. STOP refining the same query/click. "
+                        "Either pick a fundamentally different approach "
+                        "(different URL from your search results, different "
+                        "query angle, different language) OR emit fail with "
+                        "a clear reason."
+                    )
 
             if blocked_note is not None:
                 history.append({
