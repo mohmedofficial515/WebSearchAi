@@ -144,7 +144,7 @@ export function usePipeline(
     switch (ev.type) {
       case 'pipeline_plan': {
         const d = ev.data;
-        const rawSteps = (d.steps as Record<string, unknown>[]) ?? [];
+        const rawSteps = ((d.steps as unknown) as Record<string, unknown>[]) ?? [];
         dispatch({
           type: 'INIT_PLAN',
           goal: String(d.goal ?? ''),

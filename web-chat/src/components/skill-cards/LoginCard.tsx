@@ -57,7 +57,7 @@ export function LoginCard({ taskId, goal, onSuggestion, onContinue, onEnd }: Log
                 <span>✅</span>
                 <span className="text-sm font-medium">تم تسجيل الدخول بنجاح</span>
               </div>
-              {data?.goal && (
+              {!!data?.goal && (
                 <p className="text-xs text-slate-500">{String(data.goal)}</p>
               )}
               {stream.summaryAr && (

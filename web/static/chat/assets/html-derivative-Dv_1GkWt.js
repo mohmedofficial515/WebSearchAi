@@ -1,0 +1,1 @@
+import{t as e}from"./html-derivative-JSTfpDvQ.js";export{e as default};

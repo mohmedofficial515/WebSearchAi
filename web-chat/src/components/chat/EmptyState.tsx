@@ -21,7 +21,7 @@ const container = {
 
 const chipItem = {
   hidden: { opacity: 0, y: 10 },
-  show:   { opacity: 1, y: 0, transition: { duration: 0.2, ease: 'easeOut' } },
+  show:   { opacity: 1, y: 0, transition: { duration: 0.2, ease: [0.25, 0.1, 0.25, 1] as const } },
 };
 
 export function EmptyState({ onChip }: EmptyStateProps) {

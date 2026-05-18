@@ -94,7 +94,7 @@ export default function ChatPage() {
             role: 'assistant',
             text,
             pipelineId,
-            pipelineData: res.pipeline ?? null,
+            pipelineData: res.pipeline ?? undefined,
             timestamp: Date.now(),
           });
         } else if (res.mode === 'need_params' && res.missing_params) {

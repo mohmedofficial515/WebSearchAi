@@ -239,7 +239,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
               disabled:opacity-50 disabled:cursor-not-allowed
               min-h-[42px] max-h-[200px] overflow-y-auto
             "
-            style={{ direction: 'auto' }}
+            dir="auto"
           />
 
           <button
