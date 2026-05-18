@@ -23,7 +23,7 @@ if sys.platform == "win32":
 
 import httpx
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -167,12 +167,9 @@ class VisualCompareBody(BaseModel):
 # ===================== UI =====================
 
 
-@app.get("/", response_class=HTMLResponse)
-async def index() -> HTMLResponse:
-    index_path = WEB_DIR / "templates" / "index.html"
-    if not index_path.exists():
-        return HTMLResponse("<h1>WebSearchAi</h1><p>Web UI not installed.</p>")
-    return HTMLResponse(index_path.read_text(encoding="utf-8"))
+@app.get("/")
+async def index() -> RedirectResponse:
+    return RedirectResponse(url="/chat/", status_code=301)
 
 
 @app.get("/health")

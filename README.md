@@ -27,10 +27,12 @@ Built on **Mistral AI** (free tier) + **Playwright** + **FastAPI**.
 | 📦 **Clone** | Capture a page + AI-rebuild it as clean responsive Tailwind HTML |
 
 Surfaces:
-- **Web UI** at `http://127.0.0.1:8000`
+- **Chat UI** at `http://127.0.0.1:8000/chat` (React, Arabic/RTL, 18 skills) — primary interface
 - **REST API** at `/api/*` ([reference](docs/API.md))
 - **WebSocket** at `/ws/{task_id}` for live progress
 - **CLI** — `python run.py <command>` or `cli.bat <command>` on Windows
+
+> `http://127.0.0.1:8000/` redirects automatically to `/chat`.
 
 ---
 
@@ -41,7 +43,7 @@ Surfaces:
 ```powershell
 .\install.bat       # creates .venv, installs deps, downloads Chromium
 # Edit .env and paste your free Mistral key from https://console.mistral.ai/
-.\start.bat         # → http://127.0.0.1:8000
+.\start.bat         # → http://127.0.0.1:8000/chat
 ```
 
 ### Unix / macOS
@@ -51,13 +53,13 @@ python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 python -m playwright install chromium
 cp .env.example .env     # add MISTRAL_API_KEY
-python serve.py          # → http://127.0.0.1:8000
+python serve.py          # → http://127.0.0.1:8000/chat
 ```
 
 ### Docker
 
 ```bash
-docker compose up -d     # → http://localhost:8000
+docker compose up -d     # → http://localhost:8000/chat
 docker compose logs -f app
 ```
 
