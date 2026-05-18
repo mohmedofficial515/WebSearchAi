@@ -32,17 +32,19 @@ def test_event_to_dict_omits_tab_id_when_none():
 
 @pytest.mark.unit
 def test_planner_action_schema_has_tab_actions():
-    from src.core.planner import ACTION_SCHEMA_DESC
-    assert "open_tab" in ACTION_SCHEMA_DESC
-    assert "switch_tab" in ACTION_SCHEMA_DESC
-    assert "close_tab" in ACTION_SCHEMA_DESC
-    assert "list_tabs" in ACTION_SCHEMA_DESC
+    # Prompts moved to prompts/decider.md in Phase B; load via the function.
+    from src.core.planner import _system_decider
+    decider = _system_decider("ar")
+    assert "open_tab" in decider
+    assert "switch_tab" in decider
+    assert "close_tab" in decider
+    assert "list_tabs" in decider
 
 
 @pytest.mark.unit
 def test_planner_decider_prompt_mentions_tabs():
-    from src.core.planner import SYSTEM_DECIDER
-    assert "open_tab" in SYSTEM_DECIDER
+    from src.core.planner import _system_decider
+    assert "open_tab" in _system_decider("ar")
 
 
 # ── Executor tab actions ──────────────────────────────────────────────────────
