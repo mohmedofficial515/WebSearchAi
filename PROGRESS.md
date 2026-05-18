@@ -11,7 +11,7 @@
 | Phase | Name | Tasks | Status |
 |---|---|---|---|
 | **A** | Scaffolding | 10 | ✅ COMPLETE |
-| **B** | Backend additions + prompt extraction | 17 | ⏳ NEXT |
+| **B** | Backend additions + prompt extraction | 17 | ✅ COMPLETE |
 | **C** | Core chat shell | 23 | ⬜ Pending |
 | **D** | Existing skill cards (10) | 11 | ⬜ Pending |
 | **E** | Pipeline UI | 7 | ⬜ Pending |
@@ -20,7 +20,15 @@
 | **H** | Migration cutover | 11 | ⬜ Pending |
 | **I** | Polish | 8 | ⬜ Pending |
 
-**Overall progress: 10 / 103 tasks complete**
+**Overall progress: 27 / 103 tasks complete**
+
+> Phase B verified 2026-05-18:
+> - 12 new endpoints all return non-404 on live server (verified on :8011)
+> - Arabic 404 messages render correctly (RULE-27)
+> - Full unit suite: 270 passed, 0 failed
+> - Prompts moved from inline strings to `prompts/*.md` for: planner, decider,
+>   critic (4 sections), synthesizer (2 sections), verifier, explore, clone,
+>   find_components, orchestrator, continuation
 
 ---
 
