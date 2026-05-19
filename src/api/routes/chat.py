@@ -57,15 +57,18 @@ class ChatRequest(BaseModel):
     # When the user approves an already-planned pipeline.
     approved_pipeline_id: str | None = None
     locale: str = "ar"
+    # Frontend conversation ID — used for context tracking.
+    conversation_id: str | None = None
 
 
 class ChatResponse(BaseModel):
-    mode: Literal["single", "pipeline", "need_params"]
+    mode: Literal["single", "pipeline", "need_params", "chat"]
     task_id: str | None = None
     pipeline_id: str | None = None
     intent: str | None = None
     missing_params: list[str] | None = None
     pipeline: dict | None = None
+    reply_text: str | None = None
 
 
 # ── Pipeline registry — in-memory store for pending pipelines ──────────────
@@ -447,6 +450,26 @@ async def chat(body: ChatRequest) -> ChatResponse:
 
     intent = detect_intent(body.message)
     kind = body.force_skill or intent.kind
+
+    # ── 1b. Chat branch — greeting / simple conversational message ────────────
+    if kind == "chat":
+        llm = get_provider(settings)
+        system = (
+            "أنت مساعد ذكاء اصطناعي ودود ومحترف. تتحدث العربية والإنجليزية بطلاقة. "
+            "أجب على التحيات والأسئلة البسيطة بشكل طبيعي وودود وبإيجاز — لا تكن طويلاً. "
+            "إذا احتاج المستخدم بحثاً في الإنترنت أو معلومات من مواقع، يمكنه كتابة سؤاله وستبحث له فوراً."
+        )
+        try:
+            reply = await asyncio.wait_for(
+                llm.chat([
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": body.message},
+                ]),
+                timeout=20.0,
+            )
+        except Exception:
+            reply = "أهلاً وسهلاً! كيف يمكنني مساعدتك اليوم؟"
+        return ChatResponse(mode="chat", reply_text=reply)
 
     # ── 2. Missing-params check ────────────────────────────────────────
     missing: list[str] = []

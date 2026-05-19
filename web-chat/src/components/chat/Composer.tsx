@@ -7,10 +7,12 @@ import { useIntent } from '@/hooks/useIntent';
 import { useArchiveSuggestion } from '@/hooks/useArchiveSuggestion';
 import { parseSlashCommand, getSuggestedCommands } from '@/lib/slash-commands';
 import { apiUpload, type UploadResponse } from '@/lib/api';
+import { estimateTokens, formatTokens } from '@/lib/tokens';
 
 interface ComposerProps {
   onSubmit: (text: string, skillOverride: string | null, attachments: AttachmentEntry[]) => void;
   disabled?: boolean;
+  totalTokens?: number;
 }
 
 export interface ComposerHandle {
@@ -21,7 +23,7 @@ let attachCounter = 0;
 function newAttachId() { return `att-${++attachCounter}`; }
 
 export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer(
-  { onSubmit, disabled = false },
+  { onSubmit, disabled = false, totalTokens },
   ref,
 ) {
   const { t } = useTranslation();
@@ -205,6 +207,22 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
               >
                 ✕ {t('skill.auto')}
               </button>
+            )}
+          </div>
+        )}
+
+        {/* Token counter row */}
+        {(text.length > 0 || (totalTokens !== undefined && totalTokens > 0)) && (
+          <div className="flex items-center justify-between mb-1.5 px-1 text-[11px] text-slate-400 font-mono">
+            {text.length > 0 ? (
+              <span>+{formatTokens(estimateTokens(text))} tok</span>
+            ) : (
+              <span />
+            )}
+            {totalTokens !== undefined && totalTokens > 0 && (
+              <span className="text-slate-300 dark:text-slate-600">
+                {t('composer.totalTokens')}: {formatTokens(totalTokens)}
+              </span>
             )}
           </div>
         )}

@@ -1,158 +1,160 @@
-{
-  "empty": {
-    "greeting": "Hello, how can I help you today?",
-    "chips": {
-      "search": "🔍 Search for something",
-      "explore": "🎨 Analyze a website",
-      "md": "📄 Write an MD report",
-      "html": "🌐 Create an HTML page",
-      "compare": "📊 Compare competitors",
-      "login": "🔐 Log in to a site"
-    }
-  },
-  "composer": {
-    "placeholder": "Type your goal here... (/ for quick commands)",
-    "send": "Send",
-    "attach": "Attach file"
-  },
-  "sidebar": {
-    "newChat": "New Chat",
-    "history": "Previous Chats",
-    "settings": "Settings",
-    "noTasks": "No previous tasks"
-  },
-  "topbar": {
-    "darkMode": "Dark mode",
-    "lightMode": "Light mode",
-    "langAr": "العربية",
-    "langEn": "English",
-    "settings": "Settings"
-  },
-  "skill": {
-    "detecting": "Detecting...",
-    "override": "Change skill",
-    "auto": "Auto",
-    "clearOverride": "Reset to auto-detect"
-  },
-  "task": {
-    "running": "Running...",
-    "succeeded": "Completed",
-    "failed": "Failed",
-    "cancelled": "Cancelled",
-    "elapsed": "Took {{sec}} seconds"
-  },
-  "continuation": {
-    "title": "Task completed",
-    "suggestions": "Follow-up suggestions",
-    "continue": "Continue",
-    "end": "End"
-  },
-  "timeline": {
-    "plan": "Plan",
-    "step": "Step {{n}}",
-    "noSteps": "No steps yet"
-  },
-  "drawer": {
-    "screenshot": "Live Screenshot",
-    "timeline": "Execution Timeline"
-  },
-  "error": {
-    "wsDisconnected": "Connection lost",
-    "retry": "Retry",
-    "generic": "An unexpected error occurred"
-  },
-  "settings": {
-    "title": "Settings",
-    "comingSoon": "Coming soon...",
-    "tabs": {
-      "providers": "Providers",
-      "accounts": "Accounts",
-      "archive": "Archive"
-    }
-  },
-  "artifacts": {
-    "title": "Artifacts",
-    "comingSoon": "Coming soon...",
-    "empty": "No artifacts yet — they appear here after tasks run",
-    "loading": "Loading artifacts...",
-    "loadError": "Failed to load artifacts",
-    "refresh": "Refresh",
-    "download": "Download",
-    "preview": "Preview",
-    "close": "Close",
-    "filterAll": "All",
-    "noPreview": "No preview available for this type — download to view",
-    "kinds": {
-      "md": "Markdown",
-      "html": "HTML",
-      "code": "Code",
-      "mermaid": "Diagram",
-      "pdf": "PDF",
-      "zip": "Archive",
-      "json": "JSON",
-      "screenshot": "Screenshot",
-      "csv": "CSV Table"
-    }
-  },
-  "providers": {
-    "title": "AI Providers",
-    "setActive": "Set Active",
-    "active": "Active",
-    "test": "Test",
-    "testing": "Testing...",
-    "save": "💾 Save All",
-    "saveOk": "✓ Saved!",
-    "saveError": "✗ Error",
-    "testOk": "✓ Connected",
-    "testFail": "✗ Connection failed",
-    "getKey": "Get API key",
-    "configured": "Configured",
-    "notConfigured": "Not configured",
-    "liveModels": "Live models",
-    "loadingModels": "Loading models...",
-    "autoProvider": "Auto select"
-  },
-  "accounts": {
-    "title": "Registered Accounts",
-    "refresh": "Refresh",
-    "empty": "No accounts yet — use the 📧 Temp Signup skill",
-    "verified": "✓ Verified",
-    "unverified": "— Not verified",
-    "delete": "🗑 Delete",
-    "confirmDelete": "Delete this account permanently? The session file will be removed.",
-    "loading": "Loading...",
-    "loadError": "Failed to load accounts"
-  },
-  "archive": {
-    "title": "Task Archive",
-    "search": "Search archive...",
-    "empty": "No archived tasks yet. Successful runs are saved here automatically.",
-    "loading": "Loading...",
-    "searchEmpty": "No results",
-    "replay": "↻ Replay",
-    "delete": "🗑 Delete",
-    "confirmDelete": "Delete this task from the archive permanently?",
-    "goal": "Goal",
-    "summary": "Summary",
-    "confidence": "Confidence",
-    "success": "✅ Success",
-    "fail": "❌ Failed",
-    "extractions": "Extractions",
-    "plan": "Plan",
-    "result": "Full Result",
-    "close": "Close",
-    "loadError": "Failed to load"
-  },
-  "archiveSuggestion": {
-    "found": "Similar result found in archive",
-    "use": "Use result",
-    "dismiss": "Dismiss",
-    "score": "{{pct}}% match"
-  },
-  "attachment": {
-    "uploading": "Uploading...",
-    "remove": "Remove",
-    "uploadError": "Upload failed",
-    "dragDrop": "Drop files here"
-  }
+﻿{
+    "empty":  {
+                  "greeting":  "Hello, how can I help you today?",
+                  "chips":  {
+                                "search":  "ðŸ” Search for something",
+                                "explore":  "ðŸŽ¨ Analyze a website",
+                                "md":  "ðŸ“„ Write an MD report",
+                                "html":  "ðŸŒ Create an HTML page",
+                                "compare":  "ðŸ“Š Compare competitors",
+                                "login":  "ðŸ” Log in to a site"
+                            }
+              },
+    "composer":  {
+                     "placeholder":  "Type your goal here... (/ for quick commands)",
+                     "send":  "Send",
+                     "attach":  "Attach file",
+                     "totalTokens":  "Conversation total"
+                 },
+    "sidebar":  {
+                    "newChat":  "New Chat",
+                    "history":  "Previous Chats",
+                    "settings":  "Settings",
+                    "noTasks":  "No conversations yet",
+                    "tokens":  "Tokens used"
+                },
+    "topbar":  {
+                   "darkMode":  "Dark mode",
+                   "lightMode":  "Light mode",
+                   "langAr":  "Ø§Ù„Ø¹Ø±Ø¨ÙŠØ©",
+                   "langEn":  "English",
+                   "settings":  "Settings"
+               },
+    "skill":  {
+                  "detecting":  "Detecting...",
+                  "override":  "Change skill",
+                  "auto":  "Auto",
+                  "clearOverride":  "Reset to auto-detect"
+              },
+    "task":  {
+                 "running":  "Running...",
+                 "succeeded":  "Completed",
+                 "failed":  "Failed",
+                 "cancelled":  "Cancelled",
+                 "elapsed":  "Took {{sec}} seconds"
+             },
+    "continuation":  {
+                         "title":  "Task completed",
+                         "suggestions":  "Follow-up suggestions",
+                         "continue":  "Continue",
+                         "end":  "End"
+                     },
+    "timeline":  {
+                     "plan":  "Plan",
+                     "step":  "Step {{n}}",
+                     "noSteps":  "No steps yet"
+                 },
+    "drawer":  {
+                   "screenshot":  "Live Screenshot",
+                   "timeline":  "Execution Timeline"
+               },
+    "error":  {
+                  "wsDisconnected":  "Connection lost",
+                  "retry":  "Retry",
+                  "generic":  "An unexpected error occurred"
+              },
+    "settings":  {
+                     "title":  "Settings",
+                     "comingSoon":  "Coming soon...",
+                     "tabs":  {
+                                  "providers":  "Providers",
+                                  "accounts":  "Accounts",
+                                  "archive":  "Archive"
+                              }
+                 },
+    "artifacts":  {
+                      "title":  "Artifacts",
+                      "comingSoon":  "Coming soon...",
+                      "empty":  "No artifacts yet â€” they appear here after tasks run",
+                      "loading":  "Loading artifacts...",
+                      "loadError":  "Failed to load artifacts",
+                      "refresh":  "Refresh",
+                      "download":  "Download",
+                      "preview":  "Preview",
+                      "close":  "Close",
+                      "filterAll":  "All",
+                      "noPreview":  "No preview available for this type â€” download to view",
+                      "kinds":  {
+                                    "md":  "Markdown",
+                                    "html":  "HTML",
+                                    "code":  "Code",
+                                    "mermaid":  "Diagram",
+                                    "pdf":  "PDF",
+                                    "zip":  "Archive",
+                                    "json":  "JSON",
+                                    "screenshot":  "Screenshot",
+                                    "csv":  "CSV Table"
+                                }
+                  },
+    "providers":  {
+                      "title":  "AI Providers",
+                      "setActive":  "Set Active",
+                      "active":  "Active",
+                      "test":  "Test",
+                      "testing":  "Testing...",
+                      "save":  "ðŸ’¾ Save All",
+                      "saveOk":  "âœ“ Saved!",
+                      "saveError":  "âœ— Error",
+                      "testOk":  "âœ“ Connected",
+                      "testFail":  "âœ— Connection failed",
+                      "getKey":  "Get API key",
+                      "configured":  "Configured",
+                      "notConfigured":  "Not configured",
+                      "liveModels":  "Live models",
+                      "loadingModels":  "Loading models...",
+                      "autoProvider":  "Auto select"
+                  },
+    "accounts":  {
+                     "title":  "Registered Accounts",
+                     "refresh":  "Refresh",
+                     "empty":  "No accounts yet â€” use the ðŸ“§ Temp Signup skill",
+                     "verified":  "âœ“ Verified",
+                     "unverified":  "â€” Not verified",
+                     "delete":  "ðŸ—‘ Delete",
+                     "confirmDelete":  "Delete this account permanently? The session file will be removed.",
+                     "loading":  "Loading...",
+                     "loadError":  "Failed to load accounts"
+                 },
+    "archive":  {
+                    "title":  "Task Archive",
+                    "search":  "Search archive...",
+                    "empty":  "No archived tasks yet. Successful runs are saved here automatically.",
+                    "loading":  "Loading...",
+                    "searchEmpty":  "No results",
+                    "replay":  "â†» Replay",
+                    "delete":  "ðŸ—‘ Delete",
+                    "confirmDelete":  "Delete this task from the archive permanently?",
+                    "goal":  "Goal",
+                    "summary":  "Summary",
+                    "confidence":  "Confidence",
+                    "success":  "âœ… Success",
+                    "fail":  "âŒ Failed",
+                    "extractions":  "Extractions",
+                    "plan":  "Plan",
+                    "result":  "Full Result",
+                    "close":  "Close",
+                    "loadError":  "Failed to load"
+                },
+    "archiveSuggestion":  {
+                              "found":  "Similar result found in archive",
+                              "use":  "Use result",
+                              "dismiss":  "Dismiss",
+                              "score":  "{{pct}}% match"
+                          },
+    "attachment":  {
+                       "uploading":  "Uploading...",
+                       "remove":  "Remove",
+                       "uploadError":  "Upload failed",
+                       "dragDrop":  "Drop files here"
+                   }
 }

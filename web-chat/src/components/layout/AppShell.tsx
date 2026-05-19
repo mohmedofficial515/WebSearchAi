@@ -5,6 +5,7 @@ import { TopBar } from './TopBar';
 import { RightDrawer } from './RightDrawer';
 import type { TaskStreamState } from '@/hooks/useTaskStream';
 import type { TaskRecord } from '@/stores/tasksStore';
+import type { Conversation } from '@/stores/conversationsStore';
 
 interface AppShellProps {
   tasks: TaskRecord[];
@@ -12,6 +13,12 @@ interface AppShellProps {
   taskStream: TaskStreamState;
   onNewChat: () => void;
   onSelectTask: (taskId: string) => void;
+  // Conversation-aware props (optional for non-chat pages)
+  conversations?: Conversation[];
+  activeConversationId?: string | null;
+  onSelectConversation?: (id: string) => void;
+  onDeleteConversation?: (id: string) => void;
+  totalTokens?: number;
   children: React.ReactNode;
 }
 
@@ -21,6 +28,11 @@ export function AppShell({
   taskStream,
   onNewChat,
   onSelectTask,
+  conversations,
+  activeConversationId,
+  onSelectConversation,
+  onDeleteConversation,
+  totalTokens,
   children,
 }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -34,7 +46,6 @@ export function AppShell({
 
   const drawerOpen = drawerShouldShow && !drawerDismissed;
 
-  // Reset dismissed state whenever a new live stream starts
   const prevShouldShow = useRef(drawerShouldShow);
   useEffect(() => {
     if (!prevShouldShow.current && drawerShouldShow) {
@@ -43,12 +54,10 @@ export function AppShell({
     prevShouldShow.current = drawerShouldShow;
   }, [drawerShouldShow]);
 
-  // Close mobile live sheet when task stream ends
   useEffect(() => {
     if (!drawerShouldShow) setMobileLiveOpen(false);
   }, [drawerShouldShow]);
 
-  // Escape = close right drawer or mobile panels
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -68,7 +77,7 @@ export function AppShell({
       <div
         className={`
           hidden lg:flex flex-shrink-0 transition-all duration-200
-          ${sidebarOpen ? 'w-60' : 'w-0 overflow-hidden'}
+          ${sidebarOpen ? 'w-64' : 'w-0 overflow-hidden'}
         `}
       >
         <Sidebar
@@ -76,6 +85,11 @@ export function AppShell({
           activeTaskId={activeTaskId}
           onNewChat={onNewChat}
           onSelectTask={onSelectTask}
+          conversations={conversations}
+          activeConversationId={activeConversationId}
+          onSelectConversation={onSelectConversation}
+          onDeleteConversation={onDeleteConversation}
+          totalTokens={totalTokens}
         />
       </div>
 
@@ -83,7 +97,6 @@ export function AppShell({
       <AnimatePresence>
         {sidebarOpen && (
           <>
-            {/* Backdrop */}
             <motion.div
               key="sidebar-backdrop"
               className="fixed inset-0 z-30 bg-black/40 lg:hidden"
@@ -93,10 +106,9 @@ export function AppShell({
               transition={{ duration: 0.18 }}
               onClick={() => setSidebarOpen(false)}
             />
-            {/* Sidebar panel */}
             <motion.div
               key="sidebar-panel"
-              className="fixed inset-y-0 start-0 z-40 w-60 lg:hidden"
+              className="fixed inset-y-0 start-0 z-40 w-64 lg:hidden"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
@@ -107,6 +119,11 @@ export function AppShell({
                 activeTaskId={activeTaskId}
                 onNewChat={() => { onNewChat(); setSidebarOpen(false); }}
                 onSelectTask={(id) => { onSelectTask(id); setSidebarOpen(false); }}
+                conversations={conversations}
+                activeConversationId={activeConversationId}
+                onSelectConversation={(id) => { onSelectConversation?.(id); setSidebarOpen(false); }}
+                onDeleteConversation={onDeleteConversation}
+                totalTokens={totalTokens}
               />
             </motion.div>
           </>
@@ -168,7 +185,6 @@ export function AppShell({
               exit={{ y: '100%' }}
               transition={{ duration: 0.25, ease: 'easeOut' }}
             >
-              {/* Handle bar */}
               <div className="bg-slate-50 dark:bg-slate-900 flex justify-center pt-3 pb-1">
                 <div className="w-10 h-1 rounded-full bg-slate-300 dark:bg-slate-600" />
               </div>

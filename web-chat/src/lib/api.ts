@@ -55,12 +55,13 @@ export interface IntentResponse {
 }
 
 export interface ChatResponse {
-  mode: 'single' | 'pipeline' | 'need_params' | 'approved';
+  mode: 'single' | 'pipeline' | 'need_params' | 'approved' | 'chat';
   task_id?: string;
   pipeline_id?: string;
   intent?: string;
   missing_params?: string[];
   pipeline?: Record<string, unknown>;
+  reply_text?: string;
 }
 
 export interface UploadResponse {

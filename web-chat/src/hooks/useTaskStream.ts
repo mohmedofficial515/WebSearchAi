@@ -244,9 +244,42 @@ export function useTaskStream(taskId: string | null): TaskStreamState {
     doneRef.current = false;
     retryRef.current = 0;
     dispatch({ type: 'RESET' });
-    connect(taskId);
+
+    // Pre-flight: if the task is already finished (e.g. server restarted and
+    // the in-memory event bus is empty), show the final state immediately
+    // instead of opening a WS that will wait forever for events that never come.
+    let cancelled = false;
+    fetch(`/api/tasks/${taskId}`)
+      .then((r) => r.ok ? r.json() as Promise<Record<string, unknown>> : null)
+      .then((rec) => {
+        if (cancelled) return;
+        const status = rec?.status as string | undefined;
+        if (status === 'succeeded' || status === 'failed' || status === 'cancelled') {
+          doneRef.current = true;
+          const result = rec?.result as Record<string, unknown> | undefined;
+          const summaryAr =
+            (result?.summary_ar as string | undefined) ??
+            (result?.summary as string | undefined) ??
+            '';
+          dispatch({
+            type: 'DONE',
+            verdict: status === 'succeeded' ? 'success' : 'failure',
+            summaryAr,
+            elapsedSec: null,
+            status: status === 'succeeded' ? 'succeeded' : 'failed',
+          });
+        } else {
+          // Task still running (or not in persistent store yet) — connect WS
+          connect(taskId);
+        }
+      })
+      .catch(() => {
+        // Could not reach API — attempt WS connection anyway
+        if (!cancelled) connect(taskId);
+      });
 
     return () => {
+      cancelled = true;
       doneRef.current = true;
       wsRef.current?.close();
     };

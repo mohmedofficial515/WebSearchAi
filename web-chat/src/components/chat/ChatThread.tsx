@@ -109,7 +109,7 @@ export function ChatThread({ messages, onChip, onSuggestion, onContinue, onEnd }
           if (msg.role === 'user') {
             return (
               <motion.div key={msg.id} variants={msgVariants} initial="hidden" animate="show" exit="exit">
-                <MessageBubble role="user" text={msg.text} timestamp={msg.timestamp} />
+                <MessageBubble role="user" text={msg.text} timestamp={msg.timestamp} tokenCount={msg.tokenCount} />
               </motion.div>
             );
           }
@@ -146,7 +146,7 @@ export function ChatThread({ messages, onChip, onSuggestion, onContinue, onEnd }
 
           return (
             <motion.div key={msg.id} variants={msgVariants} initial="hidden" animate="show" exit="exit">
-              <MessageBubble role="assistant" text={msg.text} timestamp={msg.timestamp} />
+              <MessageBubble role="assistant" text={msg.text} timestamp={msg.timestamp} tokenCount={msg.tokenCount} />
             </motion.div>
           );
         })}

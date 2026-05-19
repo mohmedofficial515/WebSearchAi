@@ -8,4 +8,5 @@ export interface Message {
   pipelineData?: Record<string, unknown>;
   skillHint?: string;
   timestamp: number;
+  tokenCount?: number;
 }
