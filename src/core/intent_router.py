@@ -90,6 +90,23 @@ _TOKENS_PATTERNS = [
     r"\bcolor\s+palette\b",
 ]
 
+# Conversational / greeting — answered by direct LLM chat, no web browsing needed
+_CHAT_PATTERNS = [
+    # Arabic greetings (full message = greeting only)
+    r"^(مرحبا|مرحبًا|مرحباً|أهلاً?|اهلاً?|السلام عليكم|وعليكم السلام|هلا|يا هلا|حياك)\s*[!؟.,\s]*$",
+    r"^(كيف حال(ك|كم|تك)?|كيفك|كيف الحال|شو عامل|ما أخبارك|ايش أخبارك)\s*[!؟.,\s]*$",
+    r"^(صباح الخير|صباح النور|مساء الخير|مساء النور|تصبح على خير|نهارك سعيد)\s*[!؟.,\s]*$",
+    r"^(شكراً?|شكرا جزيلاً?|ممنون|متشكر|يسلموا?|مشكور|الله يسلمك)\s*[!؟.,\s]*$",
+    # Arabic identity / capability questions
+    r"^(من أنت|ما اسمك|ماذا تفعل|ما هو دورك|أخبرني عن نفسك|ما قدراتك|ما الذي تستطيع فعله|ماذا تستطيع|ما هي إمكاناتك)\s*[!؟.,\s]*$",
+    # English greetings (full message = greeting only)
+    r"^(hi|hello|hey|howdy|greetings|yo)\s*[!?.,\s]*$",
+    r"^good\s+(morning|evening|afternoon|day|night)\s*[!?.,\s]*$",
+    r"^(thanks?|thank you|thx|ty|cheers|much appreciated)\s*[!?.,\s]*$",
+    r"^(how are you|how're you|how are you doing|how's it going|what's up|sup)\s*[!?.,\s]*$",
+    r"^(who are you|what are you|what's your name|tell me about yourself|what can you do)\s*[!?.,\s]*$",
+]
+
 
 # Compile once. Each entry: (compiled_regex, intent_name).
 def _compile(patterns: list[str]) -> list[re.Pattern[str]]:
@@ -97,6 +114,8 @@ def _compile(patterns: list[str]) -> list[re.Pattern[str]]:
 
 
 _RULES: list[tuple[list[re.Pattern[str]], str]] = [
+    # Chat must be first so greetings aren't hijacked by research fallback
+    (_compile(_CHAT_PATTERNS), "chat"),
     (_compile(_TEMP_SIGNUP_PATTERNS), "temp_signup"),
     (_compile(_SIGNUP_PATTERNS), "signup"),
     (_compile(_LOGIN_PATTERNS), "login"),
@@ -110,7 +129,7 @@ _RULES: list[tuple[list[re.Pattern[str]], str]] = [
 @dataclass
 class Intent:
     """Routing decision for a natural-language goal."""
-    kind: str                            # research | signup | temp_signup | login | explore | clone | components | design_tokens
+    kind: str                            # chat | research | signup | temp_signup | login | explore | clone | components | design_tokens
     goal: str                            # cleaned goal text
     url: str | None = None               # extracted http(s) URL if any
     params: dict[str, Any] = field(default_factory=dict)
@@ -182,6 +201,9 @@ def detect_intent(goal: str) -> Intent:
     for patterns, name in _RULES:
         for p in patterns:
             if p.search(g):
+                # Chat never needs a URL — fire immediately.
+                if name == "chat":
+                    return Intent(kind="chat", goal=g, url=None, confidence=0.95)
                 # Skills that REQUIRE a URL — bail to research if missing.
                 if name in {"login", "explore", "clone", "design_tokens"} and not url:
                     continue

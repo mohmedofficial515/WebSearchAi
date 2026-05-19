@@ -56,7 +56,11 @@ def _make_provider(settings: "Settings") -> "LLMClient":
         )
     if provider == "ollama":
         from .ollama import OllamaProvider
-        return OllamaProvider(base_url=settings.ollama_base_url)
+        return OllamaProvider(
+            base_url=settings.ollama_base_url,
+            text_model=getattr(settings, "ollama_text_model", "llama3.2"),
+            vision_model=getattr(settings, "ollama_vision_model", "llava"),
+        )
 
     # ── auto-detect by available API keys ────────────────────────────────────
     if getattr(settings, "mistral_api_key", ""):
@@ -160,4 +164,8 @@ def _make_anthropic(s):
 
 def _make_ollama(s):
     from .ollama import OllamaProvider
-    return OllamaProvider(base_url=s.ollama_base_url)
+    return OllamaProvider(
+        base_url=s.ollama_base_url,
+        text_model=getattr(s, "ollama_text_model", "llama3.2"),
+        vision_model=getattr(s, "ollama_vision_model", "llava"),
+    )

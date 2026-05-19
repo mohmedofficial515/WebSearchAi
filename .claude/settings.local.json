@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(npx @playwright/mcp --version 2>&1)",
+      "PowerShell(npm list -g @playwright/mcp 2>&1)",
+      "PowerShell(Start-Sleep -Seconds 5; $tcp = New-Object System.Net.Sockets.TcpClient; $r = $tcp.BeginConnect\\(\"127.0.0.1\", 5173, $null, $null\\); $ok = $r.AsyncWaitHandle.WaitOne\\(4000\\); $tcp.Close\\(\\); if \\($ok\\) { \"Frontend READY on 5173\" } else { \"Frontend NOT ready yet\" })",
+      "PowerShell(npx playwright --version 2>&1)",
+      "Read(//c/Program Files/Google/Chrome/Application/**)",
+      "PowerShell($body = '{\"message\":\"مرحبا\",\"conversation_id\":null}'; try { $r = Invoke-RestMethod -Uri \"http://localhost:8000/api/chat\" -Method POST -Body $body -ContentType \"application/json\" -TimeoutSec 10; $r | ConvertTo-Json } catch { \"Error: $_\" })",
+      "PowerShell($taskId = \"37d0b7631d\"; try { $r = Invoke-WebRequest -Uri \"http://localhost:8000/api/tasks/$taskId\" -TimeoutSec 5; $r.Content } catch { \"Error: $_\" })",
+      "Bash(curl -s -X POST http://localhost:8000/api/chat -H 'Content-Type: application/json; charset=utf-8' -d '{\"message\":\"hello\",\"conversation_id\":null}')",
+      "Bash(curl -s \"http://localhost:8000/api/tasks/2b67ab40b4\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('status:', d['status']\\); print\\('error:', str\\(d.get\\('error',''\\)\\)[:300]\\); r=d.get\\('result'\\); print\\('result:', str\\(r\\)[:300] if r else 'None'\\)\")",
+      "Bash(curl -s \"http://localhost:8000/api/chat\" -X POST -H \"Content-Type: application/json\" -d '{\"message\":\"مرحبا\",\"conversation_id\":null}')",
+      "Bash(curl -s \"http://localhost:8000/api/tasks\")",
+      "Bash(curl -s \"http://localhost:8000/api/tasks/300ab281a2\")",
+      "Bash(taskkill //F //IM python.exe)",
+      "PowerShell(Start-Process cmd -ArgumentList \"/k\", \"cd /d `\"C:\\\\Users\\\\MOHAMED AHMED\\\\Desktop\\\\my-ai\\\\WebSearchAi`\" && call .venv\\\\Scripts\\\\activate.bat && python serve.py\" -WindowStyle Normal)",
+      "PowerShell(Start-Sleep -Seconds 5; $tcp = New-Object System.Net.Sockets.TcpClient; $r = $tcp.BeginConnect\\(\"127.0.0.1\", 8000, $null, $null\\); $ok = $r.AsyncWaitHandle.WaitOne\\(5000\\); $tcp.Close\\(\\); if \\($ok\\) { \"Backend READY\" } else { \"Not ready yet\" })",
+      "Bash(python -c ' *)",
+      "Bash(curl -s \"http://localhost:8000/api/tasks/1f26651f51\")",
+      "PowerShell(Start-Process cmd -ArgumentList \"/k\", \"cd /d `\"C:\\\\Users\\\\MOHAMED AHMED\\\\Desktop\\\\my-ai\\\\WebSearchAi`\" && call .venv\\\\Scripts\\\\activate.bat && python serve.py\" -WindowStyle Normal; Start-Sleep -Seconds 6; $tcp = New-Object System.Net.Sockets.TcpClient; $r = $tcp.BeginConnect\\(\"127.0.0.1\", 8000, $null, $null\\); $ok = $r.AsyncWaitHandle.WaitOne\\(5000\\); $tcp.Close\\(\\); if \\($ok\\) { \"Backend READY\" } else { \"Not ready\" })",
+      "Bash(curl -s -X POST \"http://localhost:8000/api/chat\" -H \"Content-Type: application/json\" -d '{\"message\":\"hello test\",\"conversation_id\":null}')",
+      "Bash(python -c \"import sys,json; tasks=json.load\\(sys.stdin\\); t=tasks[-1]; print\\('status:', t['status']\\); print\\('error:', str\\(t.get\\('error',''\\)\\)[:400]\\)\")",
+      "Bash(curl -s \"http://localhost:8000/api/tasks/6c3346ec0e\")",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(str\\(d.get\\('error',''\\)\\)[:600]\\)\")",
+      "Bash(curl -s -X POST \"http://localhost:8000/api/chat\" -H \"Content-Type: application/json\" -d '{\"message\":\"test\",\"conversation_id\":null}')"
+    ]
+  }
+}

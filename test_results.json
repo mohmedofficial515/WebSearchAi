@@ -1,0 +1,58 @@
+{
+  "passed": 10,
+  "total": 11,
+  "results": [
+    {
+      "test": "Chat page loads",
+      "ok": true,
+      "detail": "title=\"WebSearchAi\""
+    },
+    {
+      "test": "New Chat button visible",
+      "ok": true
+    },
+    {
+      "test": "Composer textarea focusable",
+      "ok": true
+    },
+    {
+      "test": "Token counter visible",
+      "ok": true,
+      "detail": "+16 tok"
+    },
+    {
+      "test": "Conversation appears in sidebar",
+      "ok": true,
+      "detail": "2 items in sidebar"
+    },
+    {
+      "test": "Token count in sidebar",
+      "ok": true,
+      "detail": "32 tok"
+    },
+    {
+      "test": "Artifacts page loads",
+      "ok": true,
+      "detail": "heading=\"Artifacts\""
+    },
+    {
+      "test": "Settings page loads",
+      "ok": false,
+      "detail": "page.goto: Timeout 10000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"http://localhost:5174/chat/settings\", waiting until \"networkidle\"\u001b[22m\n"
+    },
+    {
+      "test": "Dark mode toggle",
+      "ok": true
+    },
+    {
+      "test": "GET /api/artifacts",
+      "ok": true,
+      "detail": "status=200"
+    },
+    {
+      "test": "GET /api/tasks",
+      "ok": true,
+      "detail": "status=200"
+    }
+  ]
+}

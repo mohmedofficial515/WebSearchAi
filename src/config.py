@@ -48,6 +48,8 @@ class Settings(BaseSettings):
 
     # Ollama — local, completely free · https://ollama.com
     ollama_base_url: str = "http://localhost:11434"
+    ollama_text_model: str = "llama3.2"
+    ollama_vision_model: str = "llava"
 
     browser_headless: bool = False
     browser_type: Literal["chromium", "firefox", "webkit"] = "chromium"
