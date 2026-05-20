@@ -7,15 +7,17 @@ task id, not the final result.
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, HTTPException
 
 from ...core.agent import Agent
-from ...core.intent_router import detect_intent
+from ...core.intent_router import Intent, detect_intent
 from ...skills.clone import clone as skill_clone
 from ...skills.explore import explore as skill_explore
 from ...skills.login import login as skill_login
 from ...skills.signup import signup as skill_signup
-from ..tasks import task_manager
+from ..tasks import TaskRecord, task_manager
 from .models import (
     CloneBody,
     DesignTokensBody,
@@ -60,7 +62,7 @@ async def api_run(body: RunBody) -> dict:
             pass
 
     if body.parallel_goals:
-        async def factory(task_id: str):
+        async def factory(task_id: str) -> Any:
             async with Agent(
                 headless=body.headless,
                 use_vision=body.use_vision,
@@ -89,7 +91,7 @@ async def api_run(body: RunBody) -> dict:
             "intent": intent.to_dict(),
         }
 
-    async def factory(task_id: str):  # type: ignore[no-redef]
+    async def factory(task_id: str) -> Any:  # type: ignore[no-redef]
         async with Agent(
             headless=body.headless,
             use_vision=body.use_vision,
@@ -104,7 +106,7 @@ async def api_run(body: RunBody) -> dict:
     }
 
 
-def dispatch_skill_intent(intent, body: RunBody):
+def dispatch_skill_intent(intent: Intent, body: RunBody) -> TaskRecord:
     """Translate a natural-language Intent into a real skill task.
 
     Returns the TaskManager record so the caller can stream events on
@@ -116,7 +118,7 @@ def dispatch_skill_intent(intent, body: RunBody):
         from ...skills.temp_signup import temp_signup_persist
         site = intent.url or intent.goal
 
-        async def _factory(_task_id: str):
+        async def _factory(_task_id: str) -> Any:
             if kind == "temp_signup":
                 r = await temp_signup_persist(
                     site,
@@ -156,7 +158,7 @@ def dispatch_skill_intent(intent, body: RunBody):
         email = intent.params.get("email", "")
         password = intent.params.get("password", "")
 
-        async def _factory(_task_id: str):
+        async def _factory(_task_id: str) -> Any:
             return await _skill_login(
                 url, email, password,
                 persist_session=True,
@@ -168,7 +170,7 @@ def dispatch_skill_intent(intent, body: RunBody):
         from ...skills.explore import explore as _skill_explore
         url = intent.url or ""
 
-        async def _factory(_task_id: str):
+        async def _factory(_task_id: str) -> Any:
             r = await _skill_explore(url, intent.params.get("depth_hint") or "thorough")
             return {"site": r.site, "report": r.report, "report_path": r.report_path}
         return task_manager.submit("explore", {"goal": intent.goal, "url": url}, _factory)
@@ -177,7 +179,7 @@ def dispatch_skill_intent(intent, body: RunBody):
         from ...skills.clone import clone as _skill_clone
         url = intent.url or ""
 
-        async def _factory(_task_id: str):
+        async def _factory(_task_id: str) -> Any:
             r = await _skill_clone(url, max_assets=int(intent.params.get("max_assets") or 60))
             return {
                 "url": r.url,
@@ -191,7 +193,7 @@ def dispatch_skill_intent(intent, body: RunBody):
         from ...skills.find_components import find_components
         query = intent.params.get("query") or intent.goal
 
-        async def _factory(_task_id: str):
+        async def _factory(_task_id: str) -> Any:
             r = await find_components(
                 query,
                 max_pages=int(intent.params.get("max_pages") or 5),
@@ -207,7 +209,7 @@ def dispatch_skill_intent(intent, body: RunBody):
         from ...skills.design_tokens import extract_design_tokens
         url = intent.url or ""
 
-        async def _factory(_task_id: str):
+        async def _factory(_task_id: str) -> Any:
             tokens = await extract_design_tokens(
                 url,
                 headless=True if body.headless is None else body.headless,
@@ -219,7 +221,7 @@ def dispatch_skill_intent(intent, body: RunBody):
         )
 
     # Unknown kind shouldn't reach here, but fall back to research.
-    async def _factory(task_id: str):
+    async def _factory(task_id: str) -> Any:
         async with Agent(headless=body.headless, use_vision=body.use_vision) as agent:
             return await agent.run(intent.goal, task_id=task_id)
     return task_manager.submit("run", {"goal": intent.goal}, _factory)
@@ -230,7 +232,7 @@ def dispatch_skill_intent(intent, body: RunBody):
 
 @router.post("/api/signup")
 async def api_signup(body: SignupBody) -> dict:
-    async def factory(_task_id: str):
+    async def factory(_task_id: str) -> Any:
         result = await skill_signup(
             body.site_url,
             full_name=body.full_name,
@@ -250,7 +252,7 @@ async def api_signup(body: SignupBody) -> dict:
 
 @router.post("/api/login")
 async def api_login(body: LoginBody) -> dict:
-    async def factory(_task_id: str):
+    async def factory(_task_id: str) -> Any:
         return await skill_login(
             body.site_url,
             body.email,
@@ -265,7 +267,7 @@ async def api_login(body: LoginBody) -> dict:
 
 @router.post("/api/explore")
 async def api_explore(body: ExploreBody) -> dict:
-    async def factory(_task_id: str):
+    async def factory(_task_id: str) -> Any:
         result = await skill_explore(body.site_url, body.depth_hint)
         return {
             "site": result.site,
@@ -282,7 +284,7 @@ async def api_site_clone(body: SiteCloneBody) -> dict:
     """Crawl an entire site with BFS and save HTML for every page."""
     from ...skills.site_clone import site_clone as skill_site_clone
 
-    async def factory(_task_id: str):
+    async def factory(_task_id: str) -> Any:
         result = await skill_site_clone(
             body.url,
             max_pages=body.max_pages,
@@ -298,7 +300,7 @@ async def api_site_clone(body: SiteCloneBody) -> dict:
 
 @router.post("/api/clone")
 async def api_clone(body: CloneBody) -> dict:
-    async def factory(_task_id: str):
+    async def factory(_task_id: str) -> Any:
         result = await skill_clone(body.url, max_assets=body.max_assets)
         return {
             "url": result.url,
@@ -316,7 +318,7 @@ async def api_temp_signup(body: TempSignupBody) -> dict:
     """Sign up + persist the browser session for permanent reuse."""
     from ...skills.temp_signup import temp_signup_persist
 
-    async def factory(_task_id: str):
+    async def factory(_task_id: str) -> Any:
         result = await temp_signup_persist(
             body.site_url,
             profile_name=body.profile_name,
@@ -361,7 +363,7 @@ async def api_find_components(body: FindComponentsBody) -> dict:
     """Designer/dev skill: search → screenshot → gallery."""
     from ...skills.find_components import find_components
 
-    async def factory(_task_id: str):
+    async def factory(_task_id: str) -> Any:
         result = await find_components(
             body.query,
             max_pages=body.max_pages,
@@ -379,7 +381,7 @@ async def api_design_tokens(body: DesignTokensBody) -> dict:
     """Designer skill: extract palette / typography / spacing from a URL."""
     from ...skills.design_tokens import extract_design_tokens
 
-    async def factory(_task_id: str):
+    async def factory(_task_id: str) -> Any:
         tokens = await extract_design_tokens(
             body.url,
             headless=body.headless,

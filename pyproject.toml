@@ -173,5 +173,13 @@ module = "src.core.*"
 disallow_untyped_defs = true
 
 [[tool.mypy.overrides]]
+module = "src.api.*"
+disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = "src.skills.*"
+disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
 module = ["playwright.*", "mistralai.*"]
 ignore_missing_imports = true
