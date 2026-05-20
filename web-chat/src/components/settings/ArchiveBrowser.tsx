@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { CheckCircle, XCircle, RotateCcw, Trash2 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -97,7 +98,8 @@ function DetailModal({ taskId, onClose, onReplay, onDelete }: DetailModalProps) 
             <>
               {/* Meta row */}
               <div className="flex items-center gap-3 flex-wrap text-xs">
-                <span className={detail.success ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}>
+                <span className={`inline-flex items-center gap-1 ${detail.success ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                  {detail.success ? <CheckCircle className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
                   {detail.success ? t('archive.success') : t('archive.fail')}
                 </span>
                 <span className="text-slate-400">{t('archive.confidence')}: {conf}</span>
@@ -160,14 +162,16 @@ function DetailModal({ taskId, onClose, onReplay, onDelete }: DetailModalProps) 
               <div className="flex items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
                 <button
                   onClick={() => { onReplay(detail.goal || ''); onClose(); }}
-                  className="px-4 py-2 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
                 >
+                  <RotateCcw className="h-4 w-4" />
                   {t('archive.replay')}
                 </button>
                 <button
                   onClick={handleDelete}
-                  className="px-4 py-2 rounded-lg text-sm text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors"
                 >
+                  <Trash2 className="h-4 w-4" />
                   {t('archive.delete')}
                 </button>
                 <button

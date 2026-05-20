@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { RotateCw, Trash2, Check, Minus } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 
 interface Account {
@@ -48,9 +49,10 @@ export function AccountsLedger() {
         <button
           onClick={load}
           disabled={loading}
-          className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-50 transition-colors"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-50 transition-colors"
         >
-          {loading ? '⏳' : '↺'} {t('accounts.refresh')}
+          <RotateCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
+          {t('accounts.refresh')}
         </button>
       </div>
 
@@ -81,12 +83,13 @@ export function AccountsLedger() {
                       {a.profile_name || '?'}
                     </span>
                     <span
-                      className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                      className={`inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded font-medium ${
                         a.verified
                           ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
                           : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
                       }`}
                     >
+                      {a.verified ? <Check className="h-3 w-3" /> : <Minus className="h-3 w-3" />}
                       {a.verified ? t('accounts.verified') : t('accounts.unverified')}
                     </span>
                   </div>
@@ -101,8 +104,9 @@ export function AccountsLedger() {
                 </div>
                 <button
                   onClick={() => handleDelete(a.profile_name)}
-                  className="flex-shrink-0 px-2.5 py-1 rounded-lg text-xs text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors"
+                  className="flex-shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors"
                 >
+                  <Trash2 className="h-3 w-3" />
                   {t('accounts.delete')}
                 </button>
               </div>

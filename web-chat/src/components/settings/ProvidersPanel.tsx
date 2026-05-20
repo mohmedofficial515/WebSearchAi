@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Save, Check, X } from 'lucide-react';
 import { apiFetch, apiPost } from '@/lib/api';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -262,7 +263,7 @@ function ProviderCard({
       {/* Test result */}
       {testMsg && (
         <p
-          className={`text-xs ${
+          className={`text-xs inline-flex items-center gap-1 ${
             testStatus === 'ok'
               ? 'text-emerald-600 dark:text-emerald-400'
               : testStatus === 'fail'
@@ -270,6 +271,8 @@ function ProviderCard({
               : 'text-slate-400'
           }`}
         >
+          {testStatus === 'ok' && <Check className="h-3 w-3" />}
+          {testStatus === 'fail' && <X className="h-3 w-3" />}
           {testMsg}
         </p>
       )}
@@ -361,7 +364,7 @@ export function ProvidersPanel() {
         </select>
         <button
           onClick={handleSave}
-          className={`flex-shrink-0 px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+          className={`flex-shrink-0 inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
             saveStatus === 'ok'
               ? 'bg-emerald-600 text-white'
               : saveStatus === 'error'
@@ -369,7 +372,13 @@ export function ProvidersPanel() {
               : 'bg-indigo-600 text-white hover:bg-indigo-700'
           }`}
         >
-          {saveStatus === 'ok' ? t('providers.saveOk') : saveStatus === 'error' ? t('providers.saveError') : t('providers.save')}
+          {saveStatus === 'ok' ? (
+            <><Check className="h-4 w-4" /> {t('providers.saveOk')}</>
+          ) : saveStatus === 'error' ? (
+            <><X className="h-4 w-4" /> {t('providers.saveError')}</>
+          ) : (
+            <><Save className="h-4 w-4" /> {t('providers.save')}</>
+          )}
         </button>
       </div>
 

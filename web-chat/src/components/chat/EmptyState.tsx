@@ -5,13 +5,15 @@ interface EmptyStateProps {
   onChip: (text: string) => void;
 }
 
-const CHIPS = [
-  { key: 'search',  prompt: 'ابحث عن أفضل مكتبات React في 2025' },
-  { key: 'explore', prompt: 'حلّل موقع https://tailwindcss.com وقدّم تقريراً' },
-  { key: 'md',      prompt: 'اكتب تقرير ماركداون عن مستقبل الذكاء الاصطناعي' },
-  { key: 'html',    prompt: 'أنشئ صفحة هبوط HTML لتطبيق موبايل' },
-  { key: 'compare', prompt: 'قارن مواقع منافسة في مجال التجارة الإلكترونية' },
-  { key: 'login',   prompt: 'سجّل دخولي إلى الموقع https://example.com' },
+// Icons live here (not in the locale JSON) so a future editor saving the
+// translation file with a non-UTF-8 encoding can't break the rendering.
+const CHIPS: { key: string; icon: string; prompt: string }[] = [
+  { key: 'search',  icon: '🔍', prompt: 'ابحث عن أفضل مكتبات React في 2025' },
+  { key: 'explore', icon: '🎨', prompt: 'حلّل موقع https://tailwindcss.com وقدّم تقريراً' },
+  { key: 'md',      icon: '📄', prompt: 'اكتب تقرير ماركداون عن مستقبل الذكاء الاصطناعي' },
+  { key: 'html',    icon: '🌐', prompt: 'أنشئ صفحة هبوط HTML لتطبيق موبايل' },
+  { key: 'compare', icon: '📊', prompt: 'قارن مواقع منافسة في مجال التجارة الإلكترونية' },
+  { key: 'login',   icon: '🔐', prompt: 'سجّل دخولي إلى الموقع https://example.com' },
 ];
 
 const container = {
@@ -64,6 +66,7 @@ export function EmptyState({ onChip }: EmptyStateProps) {
               transition-colors
             "
           >
+            <span className="me-1.5" aria-hidden="true">{chip.icon}</span>
             {t(`empty.chips.${chip.key}`)}
           </motion.button>
         ))}
