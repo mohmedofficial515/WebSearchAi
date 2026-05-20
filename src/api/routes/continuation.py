@@ -160,13 +160,15 @@ async def continuation(task_or_pipeline_id: str, locale: str = "ar") -> Continua
                     cleaned.append(Suggestion(label_ar=label, prompt=prompt_text))
             if cleaned:
                 return ContinuationResponse(suggestions=cleaned[:3])
-    except Exception:
+    except (asyncio.TimeoutError, OSError, ValueError, RuntimeError):
+        # LLM unreachable or returned non-JSON — fall through to deterministic suggestions.
         pass
     finally:
         if llm is not None:
             try:
                 await llm.close()
-            except Exception:
+            except (OSError, RuntimeError):
+                # Cleanup is best-effort — connection already dead or being torn down.
                 pass
 
     # Deterministic fallback — always returns useful suggestions.

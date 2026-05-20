@@ -41,7 +41,9 @@ def verify_password(password: str, stored_hash: str) -> bool:
             _PBKDF2_HASH, password.encode(), salt.encode(), _PBKDF2_ITERS
         )
         return secrets.compare_digest(dk.hex(), expected)
-    except Exception:  # noqa: BLE001
+    except (ValueError, AttributeError):
+        # ValueError: stored_hash missing the "$" separator (corrupted/malformed).
+        # AttributeError: stored_hash is None instead of str.
         return False
 
 

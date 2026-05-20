@@ -113,8 +113,10 @@ async def _llm_confirm_compound(message: str, llm: Any) -> bool:
             timeout=3.0,
         )
         return bool(isinstance(data, dict) and data.get("compound"))
-    except Exception:
-        return True  # heuristic already said compound — trust it on timeout
+    except (asyncio.TimeoutError, OSError, ValueError, RuntimeError):
+        # Timeout / network / JSON-shape / provider issues — the rule
+        # heuristic already said "compound", so trust it.
+        return True
 
 
 # ── Single-skill dispatch ───────────────────────────────────────────────────
@@ -467,7 +469,8 @@ async def chat(body: ChatRequest) -> ChatResponse:
                 ]),
                 timeout=20.0,
             )
-        except Exception:
+        except (asyncio.TimeoutError, OSError, ValueError, RuntimeError) as exc:
+            log.warning("chat fallback reply (LLM unreachable): %s", exc)
             reply = "أهلاً وسهلاً! كيف يمكنني مساعدتك اليوم؟"
         return ChatResponse(mode="chat", reply_text=reply)
 
@@ -491,8 +494,10 @@ async def chat(body: ChatRequest) -> ChatResponse:
     if orch.is_compound_heuristic(body.message):
         try:
             confirmed = await _llm_confirm_compound(body.message, get_provider(settings))
-        except Exception:
-            confirmed = True  # fail-open: trust the heuristic
+        except (asyncio.TimeoutError, OSError, ValueError, RuntimeError):
+            # Provider unreachable or returned bad JSON — the heuristic
+            # already flagged this as compound, so trust it.
+            confirmed = True
         if confirmed:
             try:
                 pipeline = await orch.plan(body.message, locale=body.locale)

@@ -46,8 +46,8 @@ async def _persist_save(task_id: str, kind: str, params: dict, status: str) -> N
         from ..storage import get_task_store
         store = await get_task_store()
         await store.save_task(task_id, kind, params, status)
-    except Exception as exc:  # noqa: BLE001
-        log.debug(f"Task persist save failed: {exc}")
+    except Exception:  # noqa: BLE001 — sqlite/disk errors must not break task scheduling
+        log.exception("Task persist save failed (task_id=%s)", task_id)
 
 
 async def _persist_update(
@@ -57,8 +57,8 @@ async def _persist_update(
         from ..storage import get_task_store
         store = await get_task_store()
         await store.update_status(task_id, status, result=result, error=error)
-    except Exception as exc:  # noqa: BLE001
-        log.debug(f"Task persist update failed: {exc}")
+    except Exception:  # noqa: BLE001 — sqlite/disk errors must not break task scheduling
+        log.exception("Task persist update failed (task_id=%s)", task_id)
 
 
 class TaskManager:
@@ -74,8 +74,8 @@ class TaskManager:
             from ..storage import get_task_store
             store = await get_task_store()
             return await store.list_tasks(limit=limit, kind=kind)
-        except Exception as exc:  # noqa: BLE001
-            log.debug(f"Task history load failed: {exc}")
+        except Exception:  # noqa: BLE001 — fall back to empty history when DB is unavailable
+            log.exception("Task history load failed")
             return []
 
     def get(self, task_id: str) -> TaskRecord | None:
