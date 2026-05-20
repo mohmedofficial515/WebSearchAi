@@ -1,21 +1,35 @@
-"""End-to-end agent: plan → loop(perceive → decide → act) → verify."""
+"""End-to-end agent: plan → loop(perceive → decide → act) → verify.
+
+Pure helpers (URL detection, network-error pattern matching, decision
+signatures) live in `agent_helpers.py`. Memory/archive persistence
+lives in `agent_persistence.py`. Both are re-exported below so older
+imports (`from src.core.agent import TaskResult, _goal_has_literal_url`)
+keep working.
+"""
 
 from __future__ import annotations
 
 import asyncio
 import json
-import re
-import unicodedata
 import uuid
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
 
 from ..config import settings
 from ..llm.providers import get_provider
 from ..utils.event_bus import Event, bus
 from ..utils.logger import log
+from .agent_helpers import (  # noqa: F401 — re-exported for back-compat
+    _NETWORK_ERROR_PATTERNS,
+    _URL_RE,
+    TaskResult,
+    _goal_has_literal_url,
+    _host_of,
+    _is_network_error,
+    _normalize_query,
+    _signature,
+)
+from .agent_persistence import archive_task, get_memory_context, save_memory
 from .browser import BrowserSession
 from .executor import Executor
 from .perception import Perception
@@ -25,121 +39,21 @@ from .tab_manager import TabManager
 from .verifier import Verifier
 
 
-_URL_RE = re.compile(r"https?://[^\s)\]<>]+", re.IGNORECASE)
-
-
-def _goal_has_literal_url(goal: str) -> bool:
-    """True iff the goal contains a full http(s):// URL the user typed.
-
-    Search-first only kicks in when no URL is present — if the user
-    pastes 'summarize https://example.com/x' we keep the existing
-    direct-navigation flow."""
-    return bool(_URL_RE.search(goal or ""))
-
-
-# ── Loop-detection helpers ───────────────────────────────────────────────────
-
-# Connection-error substrings emitted by Playwright when a host is
-# unreachable. If we see one, we mark the host dead so the LLM can't
-# retry it 5x. This is a defensive list — anything that looks like a
-# network-layer failure counts.
-_NETWORK_ERROR_PATTERNS = (
-    "ERR_CONNECTION_TIMED_OUT",
-    "ERR_CONNECTION_REFUSED",
-    "ERR_CONNECTION_CLOSED",
-    "ERR_CONNECTION_RESET",
-    "ERR_NAME_NOT_RESOLVED",
-    "ERR_ADDRESS_UNREACHABLE",
-    "ERR_NETWORK_CHANGED",
-    "ERR_INTERNET_DISCONNECTED",
-    "ERR_SOCKS_CONNECTION_FAILED",
-    "net::ERR_",
-    "Timeout 30000ms exceeded",
-)
-
-
-def _is_network_error(note: str) -> bool:
-    if not note:
-        return False
-    s = str(note)
-    return any(p in s for p in _NETWORK_ERROR_PATTERNS)
-
-
-def _host_of(url: str) -> str:
-    try:
-        return (urlparse(url).hostname or "").lower()
-    except Exception:
-        return ""
-
-
-def _normalize_query(text: str) -> str:
-    """Strip whitespace, lowercase, drop site:/quoted operators so we
-    can tell when two ‘different’ search queries are functionally the
-    same. Without this the LLM dodges loop-detection by tacking on
-    `site:foo.com` then `site:bar.com` then `site:foo.com OR site:bar.com`."""
-    if not text:
-        return ""
-    t = unicodedata.normalize("NFKC", text).lower()
-    t = re.sub(r"\bsite:\S+", "", t)
-    t = re.sub(r"\boR\b", "", t, flags=re.IGNORECASE)
-    t = re.sub(r"[\"'`]", "", t)
-    t = re.sub(r"\s+", " ", t).strip()
-    return t
-
-
-def _signature(decision: dict) -> str:
-    """Stable signature of a decision for loop detection.
-
-    Two decisions share a signature when they're conceptually the
-    same act. Tiny edits to a search query (adding `site:` filters,
-    swapping `for` for `in`) MUST still collapse, otherwise the LLM
-    can drift in circles forever without tripping the guard."""
-    a = (decision or {}).get("action", "")
-    if a == "search_web":
-        return "search_web:" + _normalize_query(str(decision.get("query") or ""))
-    if a == "goto":
-        return "goto:" + _host_of(str(decision.get("url") or ""))
-    if a == "click":
-        return f"click:{decision.get('index')}"
-    if a == "type":
-        return f"type:{decision.get('index')}:{_normalize_query(str(decision.get('text') or ''))[:40]}"
-    if a == "press":
-        # Include the key so 'press Escape' x40 actually collapses to
-        # the same signature and trips the anti-loop guard.
-        return f"press:{(decision.get('key') or '').strip()}"
-    if a == "dismiss_overlay":
-        return "dismiss_overlay"
-    if a in {"scroll", "wait"}:
-        return f"{a}:{decision.get('direction') or decision.get('seconds') or decision.get('ms') or ''}"
-    return a or "unknown"
-
-
-@dataclass
-class TaskResult:
-    task_id: str
-    goal: str
-    success: bool
-    confidence: float
-    reason: str
-    summary: str
-    steps: list[dict[str, Any]] = field(default_factory=list)
-    plan: dict[str, Any] | None = None
-    extractions: list[str] = field(default_factory=list)
-    artifacts_dir: str | None = None
-
-    def to_dict(self) -> dict:
-        return {
-            "task_id": self.task_id,
-            "goal": self.goal,
-            "success": self.success,
-            "confidence": self.confidence,
-            "reason": self.reason,
-            "summary": self.summary,
-            "steps": self.steps,
-            "plan": self.plan,
-            "extractions": self.extractions,
-            "artifacts_dir": self.artifacts_dir,
-        }
+__all__ = [
+    "Agent",
+    "TaskResult",
+    # Re-exported helpers / persistence funcs (back-compat for tests & callers)
+    "_URL_RE",
+    "_NETWORK_ERROR_PATTERNS",
+    "_goal_has_literal_url",
+    "_host_of",
+    "_is_network_error",
+    "_normalize_query",
+    "_signature",
+    "archive_task",
+    "get_memory_context",
+    "save_memory",
+]
 
 
 class Agent:
@@ -182,7 +96,7 @@ class Agent:
 
         await self._emit(task_id, "task_start", {"goal": goal}, tab_id=tab_id)
 
-        memory_context = await self._get_memory_context(goal)
+        memory_context = await get_memory_context(goal)
         # Stash on self so _decide_with_retry can forward it to the
         # decider (the decider previously saw only `goal`, which is why
         # an Arabic 'ديل' query could drift to dell.com despite the
@@ -431,12 +345,12 @@ class Agent:
         await self._emit(task_id, "verdict", verdict, tab_id=tab_id)
 
         if bool(verdict.get("success")) and success_from_agent and plan.starting_url:
-            await self._save_memory(plan, history, extractions)
+            await save_memory(plan, history, extractions)
 
         # Archive every successful task so future identical/similar
         # requests can be served from cache without firing up the browser.
         if bool(verdict.get("success")) and success_from_agent:
-            await self._archive_task(
+            await archive_task(
                 task_id=task_id,
                 goal=goal,
                 plan=plan,
@@ -763,7 +677,7 @@ class Agent:
         await self._emit(task_id, "verdict", verdict, tab_id=tab_id)
 
         if success:
-            await self._archive_task(
+            await archive_task(
                 task_id=task_id,
                 goal=goal,
                 plan=plan,
@@ -843,135 +757,6 @@ class Agent:
                 log.warning(f"decide failed (attempt {attempt + 1}): {e}")
                 await asyncio.sleep(2)
         return {"action": "fail", "reason": "Planner could not produce a valid action"}
-
-    async def _get_memory_context(self, goal: str) -> str | None:
-        """Build a planner-context hint from prior successful runs.
-
-        Two sources are consulted, and any that fire are concatenated:
-          (1) Site-flow memory — a previously successful flow on a
-              domain mentioned literally in the goal.
-          (2) Task archive — a paraphrase of this goal we've already
-              answered. Used at a *lower* threshold than the auto-cache
-              short-circuit, because here we're not replacing the run,
-              we're just disambiguating it. e.g. user types "تطبيق ديل"
-              today; a week ago they ran "تطبيق ديل العقاري" — we surface
-              "ديل ⇒ dealapp.sa real estate" so the LLM doesn't drift
-              to dell.com.
-        """
-        parts: list[str] = []
-
-        # (1) site-flow memory (existing behaviour) ---------------------
-        try:
-            import re
-            from urllib.parse import urlparse
-            from ..memory import get_memory
-
-            m = re.search(r"https?://[^\s]+", goal)
-            if m:
-                domain_url = f"https://{urlparse(m.group(0)).netloc}"
-                if urlparse(domain_url).netloc:
-                    mem = await get_memory()
-                    cached = await mem.recall_flow(domain_url, "browse")
-                    if cached:
-                        parts.append(
-                            f"Previously successful flow for "
-                            f"{urlparse(domain_url).netloc} "
-                            f"({cached.get('success_count', 1)} run(s)):\n"
-                            + json.dumps(cached["flow_data"], ensure_ascii=False)
-                        )
-        except Exception as exc:
-            log.debug(f"Memory context (site-flow) skipped: {exc}")
-
-        # (2) archive paraphrase hint ----------------------------------
-        # Skipped when research_fresh_runs is on — the user explicitly
-        # asked never to bias new runs on cached answers. Site-flow
-        # memory (above) still applies because that's login plumbing,
-        # not goal-answer reuse.
-        if getattr(settings, "research_fresh_runs", True):
-            return "\n\n".join(parts) if parts else None
-        try:
-            from ..archive import get_archive
-            arc = await get_archive()
-            # Threshold here is below the auto-cache threshold but
-            # above noise. 0.35–0.85 means "you've answered something
-            # related — use it to ground the new run."
-            hit = await arc.find_similar(goal, threshold=0.35)
-            if hit and hit.score < 0.85:  # 0.85+ is handled by /api/run cache
-                rec = hit.record
-                # Pull a short snippet of the prior summary to anchor
-                # the model. Hard-cap to keep the planner prompt tight.
-                summary = rec.summary
-                if isinstance(summary, dict):
-                    summary = json.dumps(summary, ensure_ascii=False)[:300]
-                summary = str(summary or "")[:300]
-                starting_url = rec.starting_url or ""
-                terms = ", ".join(hit.matched_terms[:6]) or "(none)"
-                parts.append(
-                    "PRIOR-RUN HINT (use to disambiguate, do NOT copy "
-                    "the answer — the user may want fresh info):\n"
-                    f"  past goal: {rec.goal!r}\n"
-                    f"  similarity: {hit.score:.2f} (shared terms: {terms})\n"
-                    f"  past answer was about: {summary}\n"
-                    + (f"  past starting URL that worked: {starting_url}\n"
-                       if starting_url else "")
-                    + "If the current goal is asking about the SAME entity "
-                    "(same app/site/topic), trust the past starting URL "
-                    "instead of guessing a new one."
-                )
-        except Exception as exc:
-            log.debug(f"Memory context (archive) skipped: {exc}")
-
-        return "\n\n".join(parts) if parts else None
-
-    async def _archive_task(
-        self,
-        *,
-        task_id: str,
-        goal: str,
-        plan: Plan,
-        history: list[dict],
-        extractions: list[str],
-        final_summary: str,
-        verdict: dict,
-    ) -> None:
-        """Persist a successful task to the durable archive so a future
-        identical/similar request can short-circuit to the cached answer."""
-        try:
-            from ..archive import get_archive
-
-            archive = await get_archive()
-            result_payload = {
-                "task_id": task_id,
-                "goal": goal,
-                "success": True,
-                "confidence": float(verdict.get("confidence") or 0.0),
-                "summary": final_summary,
-                "reason": str(verdict.get("reason") or ""),
-                "plan": plan.to_dict(),
-                "steps": history,
-                "extractions": extractions,
-            }
-            await archive.save(task_id, goal, result_payload)
-            log.info(f"📚 Archived task {task_id}: {goal[:60]!r}")
-        except Exception as exc:  # noqa: BLE001
-            log.debug(f"Archive save skipped: {exc}")
-
-    async def _save_memory(
-        self, plan: Plan, history: list[dict], extractions: list[str]
-    ) -> None:
-        try:
-            from ..memory import get_memory
-
-            mem = await get_memory()
-            await mem.touch_site(plan.starting_url)  # type: ignore[arg-type]
-            flow = {
-                "subtasks": plan.subtasks,
-                "step_count": len(history),
-                "extractions": extractions[:3],
-            }
-            await mem.remember_flow(plan.starting_url, "browse", flow)  # type: ignore[arg-type]
-        except Exception as exc:  # noqa: BLE001
-            log.debug(f"Memory save skipped: {exc}")
 
     async def _emit(self, task_id: str, type_: str, data: dict, tab_id: str | None = None) -> None:
         await bus.publish(Event(task_id=task_id, type=type_, data=data, tab_id=tab_id))
