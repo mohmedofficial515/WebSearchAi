@@ -10,3 +10,14 @@ export interface Message {
   timestamp: number;
   tokenCount?: number;
 }
+
+// Honest report of what a research task produced. Mirrors the
+// `TaskOutcome` enum in src/api/tasks.py — see that file for the full
+// definition. `ok` is the happy path; anything else carries an
+// `outcome_reason` the UI surfaces verbatim.
+export type TaskOutcome =
+  | 'ok'
+  | 'no_results'
+  | 'partial'
+  | 'search_failed'
+  | 'synthesis_error';

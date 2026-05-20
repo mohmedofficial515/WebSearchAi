@@ -118,6 +118,12 @@ class TaskResult:
     plan: dict[str, Any] | None = None
     extractions: list[str] = field(default_factory=list)
     artifacts_dir: str | None = None
+    # Structured outcome reported back to TaskManager. We deliberately
+    # keep these as plain strings (not the TaskOutcome enum from
+    # src.api.tasks) to avoid a core → api dependency. TaskManager
+    # converts the string back into the enum at the boundary.
+    outcome: str | None = None         # "ok" | "no_results" | "partial" | "search_failed" | "synthesis_error"
+    outcome_reason: str | None = None  # human-readable explanation when outcome != "ok"
 
     def to_dict(self) -> dict:
         return {
@@ -131,6 +137,8 @@ class TaskResult:
             "plan": self.plan,
             "extractions": self.extractions,
             "artifacts_dir": self.artifacts_dir,
+            "outcome": self.outcome,
+            "outcome_reason": self.outcome_reason,
         }
 
 

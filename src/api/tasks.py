@@ -20,6 +20,22 @@ class TaskStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
+class TaskOutcome(str, Enum):
+    """Honest report of *what the task produced*, orthogonal to TaskStatus.
+
+    A task can be `status=SUCCEEDED` (the runner didn't raise) and still
+    have produced nothing useful — the previous design conflated the two
+    and gave users a green check on empty results. The frontend renders
+    a different visual state for each outcome (OK → green, NO_RESULTS →
+    amber, *_ERROR → red).
+    """
+    OK = "ok"                          # genuine answer with sources
+    NO_RESULTS = "no_results"          # search returned 0 usable sources
+    PARTIAL = "partial"                # found some sources but synthesis was weak
+    SEARCH_FAILED = "search_failed"    # all search backends threw
+    SYNTHESIS_ERROR = "synthesis_error"  # LLM synthesis call failed
+
+
 @dataclass
 class TaskRecord:
     task_id: str
@@ -28,6 +44,12 @@ class TaskRecord:
     status: TaskStatus = TaskStatus.QUEUED
     result: Any | None = None
     error: str | None = None
+    # outcome / outcome_reason are populated by the runner when the wrapped
+    # function (typically an Agent.run) returns a result with `.outcome`
+    # set. Older skill calls won't set them — that's fine; the UI treats
+    # `outcome=None` as OK so existing flows are unaffected.
+    outcome: TaskOutcome | None = None
+    outcome_reason: str | None = None
     asyncio_task: asyncio.Task | None = field(default=None, repr=False)
 
     def to_dict(self) -> dict:
@@ -38,6 +60,8 @@ class TaskRecord:
             "status": self.status.value,
             "result": self.result,
             "error": self.error,
+            "outcome": self.outcome.value if self.outcome else None,
+            "outcome_reason": self.outcome_reason,
         }
 
 
@@ -98,6 +122,25 @@ class TaskManager:
             await _persist_save(task_id, kind, params, TaskStatus.RUNNING.value)
             try:
                 result = await coro_factory(task_id)
+                # Pull outcome metadata off the raw object (TaskResult) BEFORE
+                # we coerce to dict — the dataclass-to-dict step drops attrs
+                # that aren't part of `to_dict()`.
+                _outcome = getattr(result, "outcome", None)
+                _outcome_reason = getattr(result, "outcome_reason", None)
+                if isinstance(_outcome, TaskOutcome):
+                    record.outcome = _outcome
+                elif isinstance(_outcome, str):
+                    try:
+                        record.outcome = TaskOutcome(_outcome)
+                    except ValueError:
+                        # Unknown outcome string from a downstream skill — keep
+                        # it visible in the reason so we can debug.
+                        record.outcome_reason = (
+                            f"unknown-outcome={_outcome!r}; {_outcome_reason or ''}"
+                        ).strip("; ")
+                if _outcome_reason and record.outcome_reason is None:
+                    record.outcome_reason = str(_outcome_reason)
+
                 record.result = (
                     result.to_dict() if hasattr(result, "to_dict") else result
                 )
@@ -121,6 +164,8 @@ class TaskManager:
                             "status": record.status.value,
                             "error": record.error,
                             "result": record.result,
+                            "outcome": record.outcome.value if record.outcome else None,
+                            "outcome_reason": record.outcome_reason,
                         },
                     )
                 )

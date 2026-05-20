@@ -131,8 +131,11 @@ class Agent:
                 # research returned None → fall through to legacy loop
                 # (no candidates found at all, even after re-search).
                 log.warning("Research flow produced no candidates — falling back to decide loop.")
-            except Exception as exc:  # noqa: BLE001
-                log.warning(f"Research flow crashed ({type(exc).__name__}: {exc!s:.200}). Falling back to decide loop.")
+            except (OSError, asyncio.TimeoutError, ValueError, RuntimeError) as exc:
+                # Network / browser / JSON-shape / playwright errors are the
+                # realistic failure surface of the research flow. A real bug
+                # (KeyError in our own code) should still escape so we see it.
+                log.exception("Research flow crashed; falling back to decide loop")
                 await self._emit(task_id, "research_error",
                                  {"error": f"{type(exc).__name__}: {exc!s:.200}"}, tab_id=tab_id)
 
@@ -652,7 +655,36 @@ class Agent:
         synth = await self.search_agent.synthesize(goal, useful_sources)
         await self._emit(task_id, "synthesis_done", synth.to_dict(), tab_id=tab_id)
 
-        final_summary = synth.answer or "(no answer)"
+        # Honest outcome instead of the old silent "(no answer)" string.
+        # The UI branches on `outcome` to show green/amber/red — we no
+        # longer paper over an empty result with a green check.
+        outcome: str
+        outcome_reason: str | None
+        if not useful_sources:
+            outcome = "no_results"
+            outcome_reason = (
+                f"بحثنا في {len(all_queries)} استعلام عبر {len(all_candidates_seen)} "
+                f"رابط لكن لم نجد مصادر تتجاوز عتبة الصلة "
+                f"({settings.research_relevance_threshold:.2f}). "
+                "جرّب صياغة مختلفة أو مصطلحات أدق."
+            )
+        elif not synth.answer:
+            outcome = "synthesis_error"
+            outcome_reason = synth.caveats or "النموذج جمع مصادر لكنه لم يُنتج ملخصاً صالحاً."
+        elif not synth.addresses_goal:
+            outcome = "partial"
+            outcome_reason = (
+                synth.feedback
+                or "وجدنا معلومات قريبة لكنها لا تجيب على السؤال مباشرة."
+            )
+        else:
+            outcome = "ok"
+            outcome_reason = None
+
+        # If the answer is empty we still need a summary string for the
+        # legacy summary slot (Arabic report renderer reads it). Use the
+        # outcome_reason — that's a real explanation the user can act on.
+        final_summary = synth.answer or outcome_reason or ""
 
         # ── Verify (reuses existing Verifier for consistency) ─────────
         verdict = await self.verifier.verify(
@@ -706,6 +738,8 @@ class Agent:
             },
             extractions=extractions,
             artifacts_dir=str(artifacts),
+            outcome=outcome,
+            outcome_reason=outcome_reason,
         )
         (artifacts / "result.json").write_text(
             json.dumps(result.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8"

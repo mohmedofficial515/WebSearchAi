@@ -1,8 +1,10 @@
 import { useTranslation } from 'react-i18next';
+import { AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
 import { useTaskStream } from '@/hooks/useTaskStream';
 import { getSkill } from '@/lib/skills';
 import { ActionIcon } from '@/components/live/ActionIcon';
 import { ContinuationCard } from '@/components/chat/ContinuationCard';
+import type { TaskOutcome } from '@/lib/types';
 
 interface AgentRunCardProps {
   taskId: string;
@@ -31,13 +33,51 @@ const STATUS_BADGE: Record<string, { label: string; color: string }> = {
   cancelled:  { label: 'ملغي',       color: 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400' },
 };
 
+// Maps the honest TaskOutcome to a visual treatment. `null` and `'ok'`
+// keep the existing green appearance; anything else is downgraded to
+// amber (no results) or red (something actually failed).
+function outcomeStyling(outcome: TaskOutcome | null): {
+  border: string;
+  badgeLabel: string;
+  badgeColor: string;
+  Icon: typeof AlertTriangle;
+  iconClass: string;
+} | null {
+  if (outcome === null || outcome === 'ok') return null;
+  if (outcome === 'no_results' || outcome === 'partial') {
+    return {
+      border: 'border-amber-300 dark:border-amber-700',
+      badgeLabel: outcome === 'no_results' ? 'لا توجد نتائج' : 'نتيجة جزئية',
+      badgeColor: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
+      Icon: AlertTriangle,
+      iconClass: 'text-amber-500',
+    };
+  }
+  // search_failed / synthesis_error → red
+  return {
+    border: 'border-rose-300 dark:border-rose-700',
+    badgeLabel: outcome === 'search_failed' ? 'فشل البحث' : 'فشل الصياغة',
+    badgeColor: 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300',
+    Icon: XCircle,
+    iconClass: 'text-rose-500',
+  };
+}
+
 export function AgentRunCard({ taskId, goal, skill = 'run', onSuggestion, onContinue, onEnd }: AgentRunCardProps) {
   const { t } = useTranslation();
   const stream = useTaskStream(taskId);
   const meta = getSkill(skill);
   const isDone = stream.status === 'succeeded' || stream.status === 'failed';
-  const badge = STATUS_BADGE[stream.status] ?? STATUS_BADGE['idle']!;
-  const border = STATUS_BORDER[stream.status] ?? STATUS_BORDER['idle']!;
+  // Outcome-driven styling wins over the raw status when the task
+  // finished but didn't actually produce an answer. This is the user-
+  // visible fix for "Task completed (no answer)".
+  const outcomeStyle = isDone ? outcomeStyling(stream.outcome) : null;
+  const defaultBadge = STATUS_BADGE[stream.status] ?? STATUS_BADGE['idle']!;
+  const defaultBorder = STATUS_BORDER[stream.status] ?? STATUS_BORDER['idle']!;
+  const badge = outcomeStyle
+    ? { label: outcomeStyle.badgeLabel, color: outcomeStyle.badgeColor }
+    : defaultBadge;
+  const border = outcomeStyle?.border ?? defaultBorder;
 
   return (
     <div className="space-y-3">
@@ -79,8 +119,27 @@ export function AgentRunCard({ taskId, goal, skill = 'run', onSuggestion, onCont
             </div>
           )}
 
-          {isDone && stream.summaryAr && (
-            <p className="text-sm text-slate-700 dark:text-slate-300">{stream.summaryAr}</p>
+          {/* Outcome banner for NO_RESULTS / PARTIAL / SEARCH_FAILED / SYNTHESIS_ERROR */}
+          {isDone && outcomeStyle && (
+            <div className={`flex items-start gap-2 rounded-lg p-3 text-sm ${
+              stream.outcome === 'no_results' || stream.outcome === 'partial'
+                ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200'
+                : 'bg-rose-50 dark:bg-rose-950/30 text-rose-900 dark:text-rose-200'
+            }`}>
+              <outcomeStyle.Icon className={`h-4 w-4 flex-shrink-0 mt-0.5 ${outcomeStyle.iconClass}`} />
+              <span className="flex-1">
+                {stream.outcomeReason || stream.summaryAr || 'لم تنتج المهمة جواباً.'}
+              </span>
+            </div>
+          )}
+
+          {isDone && !outcomeStyle && stream.summaryAr && (
+            <p className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
+              {stream.outcome === 'ok' && (
+                <CheckCircle2 className="h-4 w-4 flex-shrink-0 mt-0.5 text-emerald-500" />
+              )}
+              <span>{stream.summaryAr}</span>
+            </p>
           )}
 
           {isDone && stream.sources.length > 0 && (

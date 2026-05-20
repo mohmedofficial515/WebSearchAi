@@ -7,6 +7,7 @@ import type {
   Source,
   WsEvent,
 } from '@/lib/events';
+import type { TaskOutcome } from '@/lib/types';
 
 export interface TimelineStep {
   step: number;
@@ -29,6 +30,10 @@ export interface TaskStreamState {
   skillResult: Record<string, unknown> | null;
   error: string | null;
   elapsedSec: number | null;
+  // Honest outcome from the backend (`TaskOutcome` enum). `null` means
+  // legacy task without an outcome — treat as OK for back-compat.
+  outcome: TaskOutcome | null;
+  outcomeReason: string | null;
 }
 
 type Action =
@@ -40,7 +45,15 @@ type Action =
   | { type: 'SOURCES'; sources: Source[] }
   | { type: 'SUGGESTIONS'; suggestions: ContinuationSuggestion[] }
   | { type: 'SKILL_RESULT'; data: Record<string, unknown> }
-  | { type: 'DONE'; verdict: string; summaryAr: string; elapsedSec: number | null; status: 'succeeded' | 'failed' }
+  | {
+      type: 'DONE';
+      verdict: string;
+      summaryAr: string;
+      elapsedSec: number | null;
+      status: 'succeeded' | 'failed';
+      outcome: TaskOutcome | null;
+      outcomeReason: string | null;
+    }
   | { type: 'ERROR'; message: string }
   | { type: 'RESET' };
 
@@ -57,6 +70,8 @@ const INITIAL: TaskStreamState = {
   skillResult: null,
   error: null,
   elapsedSec: null,
+  outcome: null,
+  outcomeReason: null,
 };
 
 function reducer(state: TaskStreamState, action: Action): TaskStreamState {
@@ -88,6 +103,8 @@ function reducer(state: TaskStreamState, action: Action): TaskStreamState {
         verdict: action.verdict,
         summaryAr: action.summaryAr,
         elapsedSec: action.elapsedSec,
+        outcome: action.outcome,
+        outcomeReason: action.outcomeReason,
       };
     case 'ERROR':
       return { ...state, error: action.message };
@@ -151,8 +168,9 @@ export function useTaskStream(taskId: string | null): TaskStreamState {
             : (ev.data as unknown as Record<string, unknown>).success
             ? 'success'
             : 'failure';
+        const dataAny = ev.data as unknown as Record<string, unknown>;
         const summaryAr =
-          (ev.data as unknown as Record<string, unknown>).summary_ar as string ??
+          (dataAny.summary_ar as string) ??
           ev.data.summary ??
           '';
         doneRef.current = true;
@@ -162,6 +180,8 @@ export function useTaskStream(taskId: string | null): TaskStreamState {
           summaryAr,
           elapsedSec: ev.data.elapsed_sec ?? null,
           status: verdict !== 'failure' ? 'succeeded' : 'failed',
+          outcome: (dataAny.outcome as TaskOutcome | undefined) ?? null,
+          outcomeReason: (dataAny.outcome_reason as string | undefined) ?? null,
         });
         wsRef.current?.close();
         break;
@@ -179,12 +199,15 @@ export function useTaskStream(taskId: string | null): TaskStreamState {
             (result?.summary_ar as string | undefined) ??
             (result?.summary as string | undefined) ??
             '';
+          const dataAny = ev.data as unknown as Record<string, unknown>;
           dispatch({
             type: 'DONE',
             verdict: s === 'succeeded' ? 'success' : 'failure',
             summaryAr,
             elapsedSec: null,
             status: s === 'succeeded' ? 'succeeded' : 'failed',
+            outcome: (dataAny.outcome as TaskOutcome | undefined) ?? null,
+            outcomeReason: (dataAny.outcome_reason as string | undefined) ?? null,
           });
           wsRef.current?.close();
         }
@@ -267,6 +290,8 @@ export function useTaskStream(taskId: string | null): TaskStreamState {
             summaryAr,
             elapsedSec: null,
             status: status === 'succeeded' ? 'succeeded' : 'failed',
+            outcome: (rec?.outcome as TaskOutcome | undefined) ?? null,
+            outcomeReason: (rec?.outcome_reason as string | undefined) ?? null,
           });
         } else {
           // Task still running (or not in persistent store yet) — connect WS

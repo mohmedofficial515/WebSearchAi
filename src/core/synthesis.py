@@ -6,9 +6,11 @@ strict JSON; defensive fallbacks so a hiccup never sinks the whole run.
 """
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field, asdict
 from typing import Any
 
+from ..utils.logger import log
 from .prompt_loader import load_prompt
 
 
@@ -91,8 +93,11 @@ class Synthesizer:
             data = await self._llm.chat_json(_synth_system(self.locale), user)
             if isinstance(data, dict):
                 draft = data
-        except Exception:
-            draft = {}
+        except (OSError, asyncio.TimeoutError, ValueError, KeyError) as exc:
+            # Network / timeout / JSON-shape / missing-key from a malformed
+            # provider response. Real bugs in our own code still escape.
+            log.exception("Synthesis draft call failed; using fallback")
+            draft = {"_synth_error": f"{type(exc).__name__}: {exc}"}
 
         answer = str(draft.get("answer") or "").strip()
         citations_raw = draft.get("citations") or []
@@ -139,9 +144,9 @@ class Synthesizer:
                 if fc is not None:
                     confidence = _clamp01(_to_float(fc, confidence))
                 feedback = str(crit.get("feedback") or "").strip()
-        except Exception:
-            # If critic fails, keep the draft as-is.
-            pass
+        except (OSError, asyncio.TimeoutError, ValueError, KeyError) as exc:
+            # If critic fails (network / shape error), keep the draft as-is.
+            log.debug("Synthesis critique call failed: %s; keeping draft", exc)
 
         return Synthesis(
             answer=answer,
