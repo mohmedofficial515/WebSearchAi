@@ -35,6 +35,10 @@ interface ChatThreadProps {
   onSuggestion: (prompt: string) => void;
   onContinue: () => void;
   onEnd: () => void;
+  // True while we're waiting for /api/chat to come back — renders a
+  // "thinking..." bubble so the user knows the model is deciding
+  // whether to search or just reply.
+  thinking?: boolean;
 }
 
 interface SkillCardProps {
@@ -91,7 +95,7 @@ function SkillCard({ taskId, goal, skill, onSuggestion, onContinue, onEnd }: Ski
   }
 }
 
-export function ChatThread({ messages, onChip, onSuggestion, onContinue, onEnd }: ChatThreadProps) {
+export function ChatThread({ messages, onChip, onSuggestion, onContinue, onEnd, thinking = false }: ChatThreadProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -150,6 +154,17 @@ export function ChatThread({ messages, onChip, onSuggestion, onContinue, onEnd }
             </motion.div>
           );
         })}
+        {thinking && (
+          <motion.div
+            key="thinking"
+            variants={msgVariants}
+            initial="hidden"
+            animate="show"
+            exit="exit"
+          >
+            <MessageBubble role="assistant" text="" thinking />
+          </motion.div>
+        )}
       </AnimatePresence>
       <div ref={bottomRef} />
     </div>

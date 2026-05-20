@@ -33,6 +33,8 @@ def _safe_json(text: str) -> dict:
 
 
 class CohereProvider:
+    supports_tools = False
+
     """Cohere cloud provider — v2 REST API."""
 
     def __init__(self, api_key: str, text_model: str = _DEFAULT_TEXT_MODEL) -> None:

@@ -9,6 +9,8 @@ _EMBED_MODEL = "mistral-embed"
 
 
 class MistralProvider:
+    supports_tools = False
+
     def __init__(self, api_key: str, text_model: str = "mistral-small-latest", vision_model: str = "pixtral-12b-2409"):
         self._client = _MistralClient(api_key=api_key, text_model=text_model, vision_model=vision_model)
         self._api_key = api_key

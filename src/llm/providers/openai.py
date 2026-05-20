@@ -1,7 +1,10 @@
 """OpenAI provider (GPT-4o, text-embedding-3-small)."""
 from __future__ import annotations
 import base64, json, re
+from typing import Any
 import httpx
+
+from .base import ToolCall, ToolCallResponse
 
 _BASE = "https://api.openai.com/v1"
 _TEXT_MODEL = "gpt-4o-mini"
@@ -18,6 +21,8 @@ def _safe_json(text: str) -> dict:
 
 
 class OpenAIProvider:
+    supports_tools = True
+
     def __init__(self, api_key: str, text_model: str = _TEXT_MODEL, vision_model: str = _VISION_MODEL):
         self._api_key = api_key
         self._text_model = text_model
@@ -65,3 +70,62 @@ class OpenAIProvider:
 
     async def close(self) -> None:
         pass
+
+    async def chat_with_tools(
+        self,
+        messages: list[dict],
+        tools: list[dict],
+        *,
+        max_tokens: int = 1024,
+        **kwargs: Any,
+    ) -> ToolCallResponse:
+        """OpenAI Chat Completions with native function-calling.
+
+        Translates the unified `{name, description, input_schema}` tool
+        manifest into OpenAI's nested `{type: "function", function: {...}}`
+        shape, then maps `tool_calls` back into our unified
+        `ToolCallResponse`.
+        """
+        openai_tools = [
+            {
+                "type": "function",
+                "function": {
+                    "name": tool["name"],
+                    "description": tool.get("description", ""),
+                    "parameters": tool.get("input_schema") or tool.get("parameters") or {},
+                },
+            }
+            for tool in tools
+        ]
+        payload: dict = {
+            "model": self._text_model,
+            "messages": messages,
+            "tools": openai_tools,
+            "max_tokens": max_tokens,
+        }
+        data = await self._post("/chat/completions", payload)
+        choice = (data.get("choices") or [{}])[0]
+        msg = choice.get("message") or {}
+
+        tool_calls: list[ToolCall] = []
+        for tc in msg.get("tool_calls") or []:
+            fn = tc.get("function") or {}
+            args_raw = fn.get("arguments") or "{}"
+            try:
+                args = json.loads(args_raw) if isinstance(args_raw, str) else dict(args_raw)
+            except (json.JSONDecodeError, TypeError, ValueError):
+                # Model occasionally emits malformed JSON in args — keep
+                # the raw string so the caller can still surface it in
+                # an error message rather than silently dropping it.
+                args = {"_raw_arguments": str(args_raw)}
+            tool_calls.append(ToolCall(
+                id=str(tc.get("id") or ""),
+                name=str(fn.get("name") or ""),
+                arguments=args,
+            ))
+
+        return ToolCallResponse(
+            text=str(msg.get("content") or "").strip(),
+            tool_calls=tool_calls,
+            finish_reason=str(choice.get("finish_reason") or ""),
+        )

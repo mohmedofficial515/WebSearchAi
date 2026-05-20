@@ -23,7 +23,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from ...config import settings
-from ...core.intent_router import detect_intent
+from ...core.intent_router import Intent, detect_intent
 from ...core.orchestrator import Orchestrator, Pipeline
 from ...llm.providers import get_provider
 from ...utils.event_bus import Event, bus
@@ -117,6 +117,22 @@ async def _llm_confirm_compound(message: str, llm: Any) -> bool:
         # Timeout / network / JSON-shape / provider issues — the rule
         # heuristic already said "compound", so trust it.
         return True
+
+
+# ── Tool name → legacy intent kind (inverse of conversation._INTENT_TO_TOOL) ─
+
+# Conversation works in terms of `tool` names ("web_search", "clone_page",
+# ...); the legacy dispatch / UI thinks in `intent.kind` ("research",
+# "clone", ...). We translate at the boundary so we don't have to
+# rewrite the rest of the dispatch logic.
+_TOOL_TO_INTENT: dict[str, str] = {
+    "web_search": "research",
+    "clone_page": "clone",
+    "explore_site": "explore",
+    "login_site": "login",
+    "extract_design_tokens": "design_tokens",
+    "find_components": "components",
+}
 
 
 # ── Single-skill dispatch ───────────────────────────────────────────────────
@@ -450,31 +466,56 @@ async def chat(body: ChatRequest) -> ChatResponse:
             pipeline=pipeline.to_dict(),
         )
 
-    intent = detect_intent(body.message)
-    kind = body.force_skill or intent.kind
+    # ── 1b. Conversation orchestrator — LLM decides chat vs tool ─────────────
+    # When the user hasn't pinned a specific skill, route through the
+    # Conversation orchestrator: a tool-calling LLM (or LLM-gate, or
+    # rule fallback) picks between "just chat" and "invoke a skill".
+    # This is the architectural fix for "every message becomes a task".
+    if not body.force_skill:
+        from ...core.conversation import Conversation
 
-    # ── 1b. Chat branch — greeting / simple conversational message ────────────
-    if kind == "chat":
-        llm = get_provider(settings)
-        system = (
-            "أنت مساعد ذكاء اصطناعي ودود ومحترف. تتحدث العربية والإنجليزية بطلاقة. "
-            "أجب على التحيات والأسئلة البسيطة بشكل طبيعي وودود وبإيجاز — لا تكن طويلاً. "
-            "إذا احتاج المستخدم بحثاً في الإنترنت أو معلومات من مواقع، يمكنه كتابة سؤاله وستبحث له فوراً."
-        )
         try:
-            reply = await asyncio.wait_for(
-                llm.chat([
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": body.message},
-                ]),
-                timeout=20.0,
-            )
-        except (asyncio.TimeoutError, OSError, ValueError, RuntimeError) as exc:
-            log.warning("chat fallback reply (LLM unreachable): %s", exc)
-            reply = "أهلاً وسهلاً! كيف يمكنني مساعدتك اليوم؟"
-        return ChatResponse(mode="chat", reply_text=reply)
+            provider = get_provider(settings)
+        except (RuntimeError, ValueError, KeyError) as exc:
+            # No LLM configured at all — Conversation handles the rule
+            # fallback path; we still construct it with provider=None.
+            log.warning("No LLM provider available; using rule fallback: %s", exc)
+            provider = None  # type: ignore[assignment]
 
-    # ── 2. Missing-params check ────────────────────────────────────────
+        conv = Conversation(provider, locale=body.locale)
+        conv_result = await conv.handle(body.message)
+
+        if conv_result.kind == "text":
+            return ChatResponse(mode="chat", reply_text=conv_result.text)
+
+        if conv_result.kind == "need_params":
+            # Map the tool name back to the legacy intent kind for the UI.
+            legacy_kind = _TOOL_TO_INTENT.get(conv_result.tool, conv_result.tool)
+            return ChatResponse(
+                mode="need_params",
+                intent=legacy_kind,
+                missing_params=conv_result.missing_params,
+            )
+
+        # kind == "tool_call" → flow into the rest of the existing
+        # pipeline-vs-single dispatch logic below. We rebuild the
+        # legacy `intent` shape so the compound/dispatch code keeps
+        # working unchanged.
+        legacy_kind = _TOOL_TO_INTENT.get(conv_result.tool, conv_result.tool)
+        intent = Intent(
+            kind=legacy_kind,
+            goal=body.message,
+            url=conv_result.tool_arguments.get("url"),
+            params={k: v for k, v in conv_result.tool_arguments.items() if k != "url"},
+            confidence=0.9,
+        )
+        kind = legacy_kind
+    else:
+        # Explicit skill override — bypass the orchestrator entirely.
+        intent = detect_intent(body.message)
+        kind = body.force_skill
+
+    # ── 2. Missing-params check (legacy override path still needs it) ─
     missing: list[str] = []
     if kind in {"login", "explore", "clone", "design_tokens"} and not intent.url:
         missing.append("url")

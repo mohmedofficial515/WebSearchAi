@@ -6,6 +6,10 @@ interface MessageBubbleProps {
   text: string;
   timestamp?: number;
   tokenCount?: number;
+  // When true, the bubble renders a typing-indicator instead of text.
+  // Used by ChatThread to surface "the model is deciding whether to
+  // search or just reply" between submit and the /api/chat response.
+  thinking?: boolean;
 }
 
 function formatTime(ts: number): string {
@@ -17,7 +21,26 @@ export const MessageBubble = memo(function MessageBubble({
   text,
   timestamp,
   tokenCount,
+  thinking = false,
 }: MessageBubbleProps) {
+  if (thinking) {
+    return (
+      <div className="flex justify-end">
+        <div
+          className="px-4 py-2.5 rounded-2xl rounded-ee-sm bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-sm"
+          aria-label="النموذج يفكر..."
+          role="status"
+        >
+          <span className="inline-flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" style={{ animationDelay: '0ms' }} />
+            <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" style={{ animationDelay: '150ms' }} />
+            <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" style={{ animationDelay: '300ms' }} />
+          </span>
+        </div>
+      </div>
+    );
+  }
+
   if (role === 'user') {
     return (
       <div className="flex justify-start">

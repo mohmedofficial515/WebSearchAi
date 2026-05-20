@@ -46,6 +46,8 @@ def _safe_json(text: str) -> dict:
 
 
 class OpenRouterProvider:
+    supports_tools = False
+
     """OpenRouter cloud provider — OpenAI-compatible aggregator API."""
 
     def __init__(self, api_key: str, text_model: str = _DEFAULT_TEXT_MODEL) -> None:

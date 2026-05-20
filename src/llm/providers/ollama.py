@@ -17,6 +17,8 @@ def _safe_json(text: str) -> dict:
 
 
 class OllamaProvider:
+    supports_tools = False
+
     def __init__(
         self,
         base_url: str = "http://localhost:11434",

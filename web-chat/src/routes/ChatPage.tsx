@@ -257,6 +257,7 @@ export default function ChatPage() {
             onSuggestion={handleSuggestion}
             onContinue={handleContinue}
             onEnd={handleEnd}
+            thinking={sending}
           />
         </div>
         <Composer
