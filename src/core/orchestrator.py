@@ -114,9 +114,12 @@ class Pipeline:
         return None
 
 
-# A step runner takes (skill, params) and returns the skill's result dict.
-# The API layer wires this to TaskManager / the in-process skill registry.
-StepRunner = Callable[[str, dict[str, Any]], Awaitable[dict[str, Any]]]
+# A step runner takes (skill, params, on_task_id_callback) and returns the
+# skill's result dict.  The callback is called synchronously with the
+# backend task_id as soon as the task is dispatched (before it completes),
+# so the orchestrator can include task_id in PIPELINE_STEP_START.
+TaskIdCallback = Callable[[str], None]
+StepRunner = Callable[[str, dict[str, Any], TaskIdCallback | None], Awaitable[dict[str, Any]]]
 
 
 class Orchestrator:
@@ -160,7 +163,13 @@ class Orchestrator:
 
     # ── Planning ──────────────────────────────────────────────────────────
 
-    async def plan(self, message: str, *, locale: str | None = None) -> Pipeline:
+    async def plan(
+        self,
+        message: str,
+        *,
+        locale: str | None = None,
+        history: list[dict] | None = None,
+    ) -> Pipeline:
         """LLM-plan a pipeline for a (presumed compound) message.
 
         On any planner failure we degrade to a single-step "research"
@@ -171,7 +180,15 @@ class Orchestrator:
         skills_block = "\n".join(
             f"- {s['name']}: {s.get('description', '')}" for s in self._skills
         )
-        user = f"USER MESSAGE:\n{message}\n\nAVAILABLE SKILLS:\n{skills_block}"
+        history_block = ""
+        if history:
+            history_block = "CONVERSATION HISTORY (most recent last):\n"
+            for msg in history[-10:]:
+                role = "User" if msg.get("role") == "user" else "Assistant"
+                content = (msg.get("content") or "")[:400]
+                history_block += f"{role}: {content}\n"
+            history_block += "\n"
+        user = f"{history_block}USER MESSAGE:\n{message}\n\nAVAILABLE SKILLS:\n{skills_block}"
 
         data: dict[str, Any] = {}
         try:
@@ -212,10 +229,16 @@ class Orchestrator:
             data.setdefault("summary_ar", "تشغيل بحث على الرسالة")
             data.setdefault("needs_approval", False)
 
+        summary = str(data.get("summary_ar") or "")
+        critique = str(data.get("critique_ar") or "")
+        # Append critique to summary so the UI surfaces it without new fields.
+        if critique and critique not in summary:
+            summary = f"{summary} — {critique}" if summary else critique
+
         return Pipeline(
             pipeline_id=uuid.uuid4().hex,
             goal=message,
-            summary_ar=str(data.get("summary_ar") or ""),
+            summary_ar=summary,
             needs_approval=bool(data.get("needs_approval", len(steps) >= 3)),
             steps=steps,
         )
@@ -293,6 +316,28 @@ class Orchestrator:
                 return
 
             step.status = "running"
+
+            # Collect task_id as soon as the backend dispatches it (before it
+            # completes) so the frontend can subscribe to its WS stream for
+            # live in-step progress.
+            task_id_holder: list[str] = []
+
+            def _on_task_id(tid: str) -> None:
+                task_id_holder.append(tid)
+
+            # Start the step as a Task so we can yield PIPELINE_STEP_START
+            # (which needs task_id) after the dispatch is recorded but before
+            # the actual work completes.
+            step_task = asyncio.ensure_future(
+                self._fan_out(step, resolved, results, _on_task_id)
+                if step.fan_out
+                else self._step_runner(step.skill, resolved, _on_task_id)
+            )
+            # Yield control so the task coroutine runs until its first
+            # internal await, at which point the synchronous dispatch has
+            # already fired and _on_task_id has been called.
+            await asyncio.sleep(0)
+
             yield {
                 "type": PIPELINE_STEP_START,
                 "data": {
@@ -301,14 +346,12 @@ class Orchestrator:
                     "skill": step.skill,
                     "label_ar": step.label_ar,
                     "params": resolved,
+                    "task_id": task_id_holder[0] if task_id_holder else "",
                 },
             }
 
             try:
-                if step.fan_out:
-                    step_result = await self._fan_out(step, resolved, results)
-                else:
-                    step_result = await self._step_runner(step.skill, resolved)
+                step_result = await step_task
                 step.status = "succeeded"
                 step.result = step_result
                 results[step.step_id] = step_result
@@ -317,7 +360,7 @@ class Orchestrator:
                     "data": {
                         "pipeline_id": pipeline.pipeline_id,
                         "step_id": step.step_id,
-                        "ok": True,
+                        "status": "done",
                         "result": step_result,
                     },
                 }
@@ -329,7 +372,7 @@ class Orchestrator:
                     "data": {
                         "pipeline_id": pipeline.pipeline_id,
                         "step_id": step.step_id,
-                        "ok": False,
+                        "status": "failed",
                         "error": step.error,
                     },
                 }
@@ -337,17 +380,24 @@ class Orchestrator:
                     "type": PIPELINE_END,
                     "data": {
                         "pipeline_id": pipeline.pipeline_id,
-                        "ok": False,
+                        "status": "failed",
+                        "summary_ar": f"فشل في الخطوة: {step.label_ar}",
                         "failed_step": step.step_id,
                     },
                 }
                 return
 
+        all_summaries = " → ".join(
+            str((r.get("summary_ar") or r.get("summary") or "")[:60])
+            for r in results.values()
+            if isinstance(r, dict)
+        )
         yield {
             "type": PIPELINE_END,
             "data": {
                 "pipeline_id": pipeline.pipeline_id,
-                "ok": True,
+                "status": "done",
+                "summary_ar": all_summaries or "اكتملت جميع الخطوات بنجاح",
                 "results": {sid: r for sid, r in results.items()},
             },
         }
@@ -357,6 +407,7 @@ class Orchestrator:
         step: PipelineStep,
         resolved: dict[str, Any],
         results: dict[str, Any],
+        on_task_id: TaskIdCallback | None = None,
     ) -> list[Any]:
         """Run the step's skill once per item from `fan_out.over`.
 
@@ -376,11 +427,16 @@ class Orchestrator:
             items = []
 
         sem = asyncio.Semaphore(FAN_OUT_CAP)
+        first_cb_done = False
 
         async def _one(item: Any) -> Any:
+            nonlocal first_cb_done
             async with sem:
                 child_params = {**resolved, param_name: item}
-                return await self._step_runner(step.skill, child_params)
+                # Only fire the callback once (for the first parallel item).
+                cb = on_task_id if not first_cb_done else None
+                first_cb_done = True
+                return await self._step_runner(step.skill, child_params, cb)
 
         return await asyncio.gather(*[_one(it) for it in items], return_exceptions=False)
 
@@ -430,6 +486,7 @@ _DEFAULT_SKILLS: list[dict[str, str]] = [
     {"name": "site_clone", "description": "Crawl a whole site and download its HTML."},
     {"name": "find_components", "description": "Search the web for UI components and build a gallery."},
     {"name": "design_tokens", "description": "Extract colors/typography/spacing from a URL."},
+    {"name": "html_artifact", "description": "Create or redesign a complete professional HTML page from a text description. No URL required — just describe the page goal including any research results from earlier steps. Use for any task that creates, builds, or updates an HTML design page (adding fonts, icons, images, layouts, etc.)."},
     {"name": "login", "description": "Log into a site with email + password."},
     {"name": "signup", "description": "Sign up on a site with a disposable email."},
     {"name": "temp_signup", "description": "Sign up with persistent browser profile."},

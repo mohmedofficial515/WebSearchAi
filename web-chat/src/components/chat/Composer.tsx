@@ -1,11 +1,12 @@
-import { forwardRef, useCallback, useImperativeHandle, useRef, useState, type DragEvent, type KeyboardEvent } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SkillBadge } from './SkillBadge';
+import { SlashCommandDropdown } from './SlashCommandDropdown';
 import { AttachmentPreview, type AttachmentEntry } from './AttachmentPreview';
 import { ArchiveSuggestionBanner } from './ArchiveSuggestionBanner';
 import { useIntent } from '@/hooks/useIntent';
 import { useArchiveSuggestion } from '@/hooks/useArchiveSuggestion';
-import { parseSlashCommand, getSuggestedCommands } from '@/lib/slash-commands';
+import { parseSlashCommand, getSuggestedCommands, type SlashCommand } from '@/lib/slash-commands';
 import { apiUpload, type UploadResponse } from '@/lib/api';
 import { estimateTokens, formatTokens } from '@/lib/tokens';
 
@@ -43,7 +44,18 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
   const intentResult = useIntent(text);
   const archiveSuggestion = useArchiveSuggestion(text);
   const slashSkill = parseSlashCommand(text);
-  const suggestedCommands = getSuggestedCommands(text);
+  const suggestedCommands = useMemo(() => getSuggestedCommands(text), [text]);
+
+  // Slash dropdown is open when input starts with `/` and the user is still
+  // editing the first token (i.e. no space yet — once they typed a space we
+  // treat the command as locked-in and the dropdown closes).
+  const showSlashDropdown = text.startsWith('/') && !text.includes(' ');
+  const [slashIndex, setSlashIndex] = useState(0);
+
+  // Reset selection whenever the suggestion list shrinks/changes shape
+  useEffect(() => {
+    if (slashIndex >= suggestedCommands.length) setSlashIndex(0);
+  }, [suggestedCommands.length, slashIndex]);
 
   const detectedSkill = skillOverride ?? slashSkill ?? intentResult?.intent ?? null;
   const confidence = skillOverride ? 1 : slashSkill ? 1 : intentResult?.confidence;
@@ -90,7 +102,42 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
     textareaRef.current?.focus();
   }, [canSend, text, skillOverride, slashSkill, attachments, onSubmit]);
 
+  const pickSlashCommand = useCallback((cmd: SlashCommand) => {
+    setText(cmd.command + ' ');
+    // Refocus and place caret at end
+    requestAnimationFrame(() => {
+      const ta = textareaRef.current;
+      if (!ta) return;
+      ta.focus();
+      const len = ta.value.length;
+      ta.setSelectionRange(len, len);
+    });
+  }, []);
+
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (showSlashDropdown && suggestedCommands.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSlashIndex((i) => (i + 1) % suggestedCommands.length);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSlashIndex((i) => (i - 1 + suggestedCommands.length) % suggestedCommands.length);
+        return;
+      }
+      if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) {
+        e.preventDefault();
+        const cmd = suggestedCommands[slashIndex];
+        if (cmd) pickSlashCommand(cmd);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setText('');
+        return;
+      }
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
@@ -172,23 +219,15 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
         onRemove={(id) => setAttachments((prev) => prev.filter((a) => a.id !== id))}
       />
 
-      <div className="p-4">
-        {/* Slash command suggestions */}
-        {suggestedCommands.length > 0 && (
-          <div className="mb-2 flex flex-wrap gap-1.5">
-            {suggestedCommands.map((cmd) => (
-              <button
-                key={cmd.command}
-                onClick={() => setText(cmd.command + ' ')}
-                className="px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 dark:bg-slate-800
-                  text-slate-600 dark:text-slate-400 hover:bg-indigo-50 hover:text-indigo-700
-                  dark:hover:bg-indigo-950 dark:hover:text-indigo-300 transition-colors"
-              >
-                <span className="font-mono">{cmd.command}</span>
-                <span className="ms-1 opacity-60">{cmd.labelAr}</span>
-              </button>
-            ))}
-          </div>
+      <div className="p-4 relative">
+        {/* Slash command dropdown (Cmd-K style picker) */}
+        {showSlashDropdown && (
+          <SlashCommandDropdown
+            commands={suggestedCommands}
+            activeIndex={slashIndex}
+            onSelect={pickSlashCommand}
+            onHover={setSlashIndex}
+          />
         )}
 
         {/* Skill badge row */}
@@ -229,6 +268,26 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
 
         {/* Input row */}
         <div className="flex items-end gap-2">
+          {/* Slash command picker button */}
+          <button
+            type="button"
+            onClick={() => {
+              setText('/');
+              requestAnimationFrame(() => {
+                const ta = textareaRef.current;
+                if (!ta) return;
+                ta.focus();
+                ta.setSelectionRange(1, 1);
+              });
+            }}
+            disabled={disabled}
+            aria-label={t('composer.slash', 'الأوامر السريعة')}
+            title={t('composer.slash', 'الأوامر السريعة')}
+            className="flex-shrink-0 w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 flex items-center justify-center hover:bg-indigo-100 hover:text-indigo-600 dark:hover:bg-indigo-950/40 dark:hover:text-indigo-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-sm font-mono font-semibold"
+          >
+            /
+          </button>
+
           {/* Attach button */}
           <button
             type="button"

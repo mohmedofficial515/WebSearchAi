@@ -632,9 +632,13 @@ def clone(url: str, max_assets: int = 60):
     result = asyncio.run(skill_clone(url, max_assets=max_assets))
     rprint(
         Panel.fit(
+            f"index:    {result.index_html_path}\n"
             f"raw:      {result.raw_dir}\n"
-            f"rebuilt:  {result.rebuilt_html_path}\n"
-            f"assets:   {len(result.assets)}\n",
+            f"media:    {result.media_count}\n"
+            f"css:      {result.css_count}\n"
+            f"js:       {result.js_count}\n"
+            f"swaps:    {len(result.library_swaps)}\n"
+            f"dropped:  {len(result.dropped_assets)}\n",
             title="Clone",
             border_style="yellow",
         )

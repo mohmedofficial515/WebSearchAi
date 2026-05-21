@@ -1,7 +1,11 @@
 """Auto-select LLM provider based on available API keys.
 
 Priority chain (explicit → auto-detect):
-  mistral → openai → anthropic → groq → gemini → cohere → openrouter → ollama
+  deepseek → mistral → openai → anthropic → groq → gemini → cohere → openrouter → ollama
+
+DeepSeek leads the auto chain because it's the project's preferred free
+provider (talks to chat.deepseek.com via a Node bridge — no API key, just
+a captured browser auth token). Falls through to the others if no token.
 """
 from __future__ import annotations
 
@@ -17,6 +21,15 @@ def _make_provider(settings: "Settings") -> "LLMClient":
     provider = getattr(settings, "llm_provider", "auto")
 
     # ── explicit selection ────────────────────────────────────────────────────
+    if provider == "deepseek":
+        from .deepseek import DeepSeekProvider
+        return DeepSeekProvider(
+            token=getattr(settings, "deepseek_user_token", ""),
+            thinking=getattr(settings, "deepseek_thinking", False),
+        )
+    if provider == "chatgpt":
+        from .chatgpt import ChatGPTProvider
+        return ChatGPTProvider(model=getattr(settings, "chatgpt_model", "auto"))
     if provider == "mistral":
         from .mistral import MistralProvider
         return MistralProvider(
@@ -63,6 +76,14 @@ def _make_provider(settings: "Settings") -> "LLMClient":
         )
 
     # ── auto-detect by available API keys ────────────────────────────────────
+    # DeepSeek wins when the user has captured a web-session token — no
+    # API key needed, free tier, and it's the project's preferred provider.
+    if getattr(settings, "deepseek_user_token", ""):
+        from .deepseek import DeepSeekProvider
+        return DeepSeekProvider(
+            token=settings.deepseek_user_token,
+            thinking=getattr(settings, "deepseek_thinking", False),
+        )
     if getattr(settings, "mistral_api_key", ""):
         from .mistral import MistralProvider
         return MistralProvider(
@@ -120,6 +141,8 @@ def get_provider(settings: "Settings") -> "LLMClient":
 def make_named_provider(name: str, settings: "Settings") -> "LLMClient":
     """Build a specific provider by name — used for connection testing."""
     builders = {
+        "deepseek": lambda: _make_deepseek(settings),
+        "chatgpt": lambda: _make_chatgpt(settings),
         "groq": lambda: _make_groq(settings),
         "gemini": lambda: _make_gemini(settings),
         "cohere": lambda: _make_cohere(settings),
@@ -133,6 +156,17 @@ def make_named_provider(name: str, settings: "Settings") -> "LLMClient":
         raise ValueError(f"Unknown provider: {name!r}")
     return builders[name]()
 
+
+def _make_deepseek(s):
+    from .deepseek import DeepSeekProvider
+    return DeepSeekProvider(
+        token=getattr(s, "deepseek_user_token", ""),
+        thinking=getattr(s, "deepseek_thinking", False),
+    )
+
+def _make_chatgpt(s):
+    from .chatgpt import ChatGPTProvider
+    return ChatGPTProvider(model=getattr(s, "chatgpt_model", "auto"))
 
 def _make_groq(s):
     from .groq import GroqProvider

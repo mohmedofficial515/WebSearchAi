@@ -203,23 +203,27 @@ def _system_prompt(locale: str) -> str:
 
 
 _GATE_INSTRUCTION_AR = (
-    "أنت موجِّه ذكي يقرر إذا كان النموذج سيرد على المستخدم نصياً أم سيستدعي أداة. "
-    "اقرأ الرسالة وأعِد JSON صحيحاً فقط بهذا الشكل:\n"
+    "أنت مساعد ذكي تقرر كيف تتعامل مع رسالة المستخدم. "
+    "أعِد JSON صحيحاً فقط بهذا الشكل الدقيق:\n"
     '{"action":"chat"|"web_search"|"clone_page"|"explore_site"|"login_site"|"extract_design_tokens"|"find_components",'
-    '"reason":"..."}\n'
-    "اختر chat للتحايا، الأسئلة التعريفية، والمحادثات العامة التي لا تحتاج بحثاً. "
-    "اختر web_search لأي سؤال يحتاج معلومات حديثة. اختر الأدوات الأخرى عندما يذكر "
-    "المستخدم رابطاً وفعلاً محدداً عليه."
+    '"reply":"...الرد الكامل باللغة العربية إذا كان action هو chat وإلا اتركه فارغاً...","reason":"..."}\n\n'
+    "قواعد الاختيار:\n"
+    "- chat: للتحايا، الأسئلة التعريفية، والمحادثات العامة التي تعرف إجابتها. عند اختيار chat اكتب الرد الكامل في حقل reply.\n"
+    "- web_search: لأي سؤال يحتاج معلومات حديثة أو خارجية.\n"
+    "- الأدوات الأخرى: عندما يذكر المستخدم رابطاً وفعلاً محدداً عليه.\n"
+    "لا تكتب أي شيء خارج JSON."
 )
 
 _GATE_INSTRUCTION_EN = (
-    "You are a router. Decide whether the model should reply textually or "
-    "invoke a tool. Return JSON only:\n"
+    "You are a smart assistant deciding how to handle a user message. "
+    "Return ONLY valid JSON in this exact shape:\n"
     '{"action":"chat"|"web_search"|"clone_page"|"explore_site"|"login_site"|"extract_design_tokens"|"find_components",'
-    '"reason":"..."}\n'
-    "Pick chat for greetings, identity questions, and general chit-chat. "
-    "Pick web_search for anything needing fresh info. Pick the other tools "
-    "when the user names a specific URL and action."
+    '"reply":"...full reply text if action is chat, else empty string...","reason":"..."}\n\n'
+    "Rules:\n"
+    "- chat: greetings, identity questions, general knowledge you can answer directly. When chat, write the full reply in the reply field.\n"
+    "- web_search: anything requiring current or external information.\n"
+    "- other tools: when user names a specific URL and action.\n"
+    "Return nothing outside the JSON object."
 )
 
 
@@ -326,17 +330,37 @@ class Conversation:
         """Cheap JSON-only LLM call for providers that don't expose native tools."""
         assert self._provider is not None
         system = _GATE_INSTRUCTION_AR if self._locale.startswith("ar") else _GATE_INSTRUCTION_EN
+
+        user_prompt = ""
+        if self._history:
+            user_prompt += "Recent conversation history for context:\n"
+            for msg in self._history:
+                role = "User" if msg.get("role") == "user" else "Assistant"
+                user_prompt += f"{role}: {msg.get('content')}\n"
+            user_prompt += "\n"
+        user_prompt += f"Current message: {message}"
+
         data = await asyncio.wait_for(
-            self._provider.chat_json(system, message),
+            self._provider.chat_json(system, user_prompt),
             timeout=self._tool_timeout,
         )
 
         action = str((data or {}).get("action") or "chat").strip()
 
         if action == "chat" or action not in {t["name"] for t in TOOLS_MANIFEST}:
-            # Gate said "just chat", or returned a tool name we don't have —
-            # produce a real conversational reply with a second LLM call.
-            reply = await self._textual_reply(message)
+            # Gate decided to chat. Use the reply baked into the gate JSON
+            # (avoids a second LLM call and prevents session contamination on
+            # web-session providers like DeepSeek/ChatGPT that share a browser
+            # session across calls — a second call would see the JSON context
+            # and echo JSON back).
+            reply = str((data or {}).get("reply") or "").strip()
+            if not reply:
+                # Fallback: gate didn't include a reply (older format) — make
+                # a separate text call. This is safe for API providers that
+                # don't share session state.
+                reply = await self._textual_reply(message)
+            if not reply:
+                reply = self._fallback_text()
             return ConversationResponse(kind="text", text=reply, path="gate")
 
         # Gate picked a tool. The gate prompt is intentionally minimal — it

@@ -14,6 +14,7 @@
     "placeholder": "Type your goal here... (/ for quick commands)",
     "send": "Send",
     "attach": "Attach file",
+    "slash": "Quick commands",
     "totalTokens": "Conversation total"
   },
   "sidebar": {
@@ -21,7 +22,8 @@
     "history": "Previous Chats",
     "settings": "Settings",
     "noTasks": "No conversations yet",
-    "tokens": "Tokens used"
+    "tokens": "Tokens used",
+    "savedDesigns": "Saved Designs"
   },
   "topbar": {
     "darkMode": "Dark mode",

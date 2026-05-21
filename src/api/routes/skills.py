@@ -183,9 +183,14 @@ def dispatch_skill_intent(intent: Intent, body: RunBody) -> TaskRecord:
             r = await _skill_clone(url, max_assets=int(intent.params.get("max_assets") or 60))
             return {
                 "url": r.url,
+                "out_dir": r.out_dir,
+                "index_html_path": r.index_html_path,
                 "raw_dir": r.raw_dir,
-                "rebuilt_html_path": r.rebuilt_html_path,
-                "assets": r.assets,
+                "media_count": r.media_count,
+                "css_count": r.css_count,
+                "js_count": r.js_count,
+                "library_swaps": r.library_swaps,
+                "dropped_count": len(r.dropped_assets),
             }
         return task_manager.submit("clone", {"goal": intent.goal, "url": url}, _factory)
 
@@ -304,9 +309,14 @@ async def api_clone(body: CloneBody) -> dict:
         result = await skill_clone(body.url, max_assets=body.max_assets)
         return {
             "url": result.url,
+            "out_dir": result.out_dir,
+            "index_html_path": result.index_html_path,
             "raw_dir": result.raw_dir,
-            "rebuilt_html_path": result.rebuilt_html_path,
-            "assets": result.assets,
+            "media_count": result.media_count,
+            "css_count": result.css_count,
+            "js_count": result.js_count,
+            "library_swaps": result.library_swaps,
+            "dropped_count": len(result.dropped_assets),
         }
 
     rec = task_manager.submit("clone", body.model_dump(), factory)

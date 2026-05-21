@@ -213,12 +213,18 @@ class SearchAgent:
         max_candidates: int | None = None,
         avoid_hosts: set[str] | None = None,
         avoid_queries: set[str] | None = None,
+        seed_queries: list[str] | None = None,
         on_event: Callable[[str, dict[str, Any]], Awaitable[None]] | None = None,
     ) -> ResearchPlan:
         """Run the full pre-visit pipeline.
 
         Steps:
-          1. generate diverse queries (Critic.generate_queries)
+          1. generate diverse queries (Critic.generate_queries) — or use
+             `seed_queries` verbatim when the caller (re-search round)
+             already has critic-proposed angles. Passing seed_queries is
+             how we keep `goal` pristine instead of mutating it with
+             "| retry-angles: …" suffixes that bloat into a 500-char
+             string by round 3 and break the SERP.
           2. parallel search across queries (asyncio.gather)
           3. dedupe by URL, attach which-queries-matched
           4. heuristic rank (TF-IDF + URL shape)
@@ -230,7 +236,24 @@ class SearchAgent:
         n_queries = max_queries or getattr(settings, "research_max_queries", 5)
 
         # ── 1. queries ─────────────────────────────────────────────────
-        queries = await self.critic.generate_queries(goal, max_queries=n_queries)
+        if seed_queries:
+            # Caller supplied queries verbatim (typically the critic's
+            # new_queries from the previous re-search round). Anchor on
+            # the literal goal first so we never lose the user's exact
+            # phrasing, then dedupe.
+            literal = goal.strip()
+            raw_seed = [literal] if literal else []
+            raw_seed.extend(str(q).strip() for q in seed_queries if str(q).strip())
+            seen: set[str] = set()
+            queries = []
+            for q in raw_seed:
+                k = q.lower()
+                if k not in seen:
+                    seen.add(k)
+                    queries.append(q)
+            queries = queries[:n_queries]
+        else:
+            queries = await self.critic.generate_queries(goal, max_queries=n_queries)
         if avoid_queries:
             queries = [q for q in queries if q.lower() not in {a.lower() for a in avoid_queries}]
         if not queries:

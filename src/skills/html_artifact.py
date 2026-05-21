@@ -1,4 +1,4 @@
-"""Skill: generate a complete HTML page artifact."""
+"""Skill: generate a complete, professional HTML page artifact."""
 from __future__ import annotations
 
 import re
@@ -18,28 +18,45 @@ class HtmlArtifactResult:
     path: str
 
 
-_SYSTEM = (
-    "أنت مطور ويب خبير. أنتج صفحة HTML كاملة واحترافية بناءً على طلب المستخدم.\n"
-    "الصفحة يجب أن تتضمن:\n"
-    "  - DOCTYPE html، meta charset UTF-8، meta viewport\n"
-    "  - تصميم جميل باستخدام CSS inline أو داخل <style>\n"
-    "  - دعم RTL إذا كان المحتوى عربياً\n"
-    "  - لا تعتمد على مكتبات خارجية — كل شيء self-contained\n"
-    "أرجع كود HTML فقط — ابدأ بـ <!DOCTYPE html> مباشرةً."
-)
+_SYSTEM = """\
+أنت مصمم ويب خبير ومطور front-end محترف. مهمتك إنشاء صفحات HTML كاملة واحترافية \
+ذات جودة إنتاجية عالية بناءً على وصف المستخدم.
+
+قواعد الإنتاج:
+1. ابدأ دائماً بـ <!DOCTYPE html> — لا شيء قبلها.
+2. استخدم meta charset="UTF-8" و meta viewport.
+3. الخطوط: استخدم Google Fonts عبر CDN (رابط <link> في <head>).
+   - للمحتوى العربي: اختر من (Tajawal, Cairo, Almarai, IBM Plex Arabic, Rubik).
+   - للمحتوى الإنجليزي: اختر من (Inter, Poppins, Nunito, Raleway, Montserrat).
+4. الأيقونات: استخدم Font Awesome 6 عبر CDN:
+   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+5. CSS: كل الأنماط داخل <style> في <head> — لا ملفات خارجية.
+   استخدم CSS Variables لـ (--primary-color, --secondary-color, --font-main, --bg-color).
+   استخدم Flexbox/Grid للتخطيط. أضف :hover transitions ناعمة.
+6. RTL: إذا كان المحتوى عربياً، أضف dir="rtl" على <html> و text-align: right على body.
+7. الصور: استخدم Unsplash (https://source.unsplash.com/800x400/?keyword) أو SVG placeholders.
+8. الكود يجب أن يكون self-contained تماماً — لا JS imports خارجية.
+9. الجودة البصرية: تدرجات ألوان (gradients)، ظلال (box-shadow)، زوايا مدوّرة، تباعد سخي.
+10. أرجع HTML نقياً فقط — ابدأ بـ <!DOCTYPE html> مباشرةً، لا شرح ولا markdown.
+"""
 
 
-async def html_artifact(goal: str) -> HtmlArtifactResult:
+async def html_artifact(goal: str, *, context: str = "") -> HtmlArtifactResult:
     llm = get_provider(settings)
+    if context:
+        user_prompt = f"{context}\n\nالمهمة الحالية:\n{goal}"
+    else:
+        user_prompt = goal
+
     try:
         log.info("html_artifact: generating for goal=%r", goal[:80])
         content = await llm.chat(
             messages=[
                 {"role": "system", "content": _SYSTEM},
-                {"role": "user", "content": goal},
+                {"role": "user", "content": user_prompt},
             ],
-            max_tokens=6000,
-            temperature=0.3,
+            max_tokens=8000,
+            temperature=0.25,
         )
     finally:
         await llm.close()

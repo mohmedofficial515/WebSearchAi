@@ -36,6 +36,69 @@ async def _emit_skill_result(task_id: str, data: dict) -> None:
     await bus.publish(Event(task_id=task_id, type="skill_result", data=data))
 
 
+async def _emit_task_plan(task_id: str, phases: list[tuple[str, str]]) -> None:
+    """Emit a plan event with named phases so the UI shows a pre-execution checklist.
+
+    phases: list of (label_ar, goal_ar) tuples — each becomes a visible plan step.
+    """
+    steps = [
+        {"id": str(i + 1), "skill": label, "goal": goal}
+        for i, (label, goal) in enumerate(phases)
+    ]
+    await bus.publish(Event(task_id=task_id, type="plan", data={"steps": steps}))
+
+
+# Per-skill phase definitions — shown in the UI as a plan checklist.
+_SKILL_PHASES: dict[str, list[tuple[str, str]]] = {
+    "html_artifact": [
+        ("تحليل الطلب", "فهم متطلبات التصميم والهدف"),
+        ("تخطيط التصميم", "تحديد البنية والألوان والخطوط"),
+        ("توليد HTML", "كتابة كود HTML احترافي مع CSS و JS"),
+        ("مراجعة الجودة", "التحقق من الجودة البصرية والتوافق"),
+    ],
+    "md_writer": [
+        ("تحليل الموضوع", "فهم نطاق الوثيقة المطلوبة"),
+        ("كتابة الوثيقة", "صياغة محتوى Markdown منظم"),
+        ("مراجعة المحتوى", "تدقيق وتحسين النص النهائي"),
+    ],
+    "competitor_matrix": [
+        ("تحديد المنافسين", "استخراج قائمة الشركات المنافسة"),
+        ("تحليل المعايير", "تحديد نقاط المقارنة"),
+        ("بناء المصفوفة", "إنشاء جدول المقارنة التفصيلي"),
+    ],
+    "mermaid_diagram": [
+        ("تحليل الهيكل", "فهم العلاقات المطلوب رسمها"),
+        ("توليد المخطط", "كتابة كود Mermaid"),
+    ],
+    "summarize": [
+        ("قراءة المحتوى", "استيعاب النص المراد تلخيصه"),
+        ("التلخيص", "استخلاص النقاط الجوهرية"),
+    ],
+    "translate": [
+        ("تحليل النص", "فهم السياق والأسلوب"),
+        ("الترجمة", "ترجمة المحتوى بدقة"),
+    ],
+    "explore": [
+        ("تحليل الموقع", "استكشاف بنية الموقع وصفحاته"),
+        ("جمع البيانات", "زيارة الصفحات الرئيسية"),
+        ("تقييم التجربة", "تحليل UX والميزات التقنية"),
+        ("كتابة التقرير", "توليد تقرير منظم"),
+    ],
+    "clone": [
+        ("تحميل الصفحة", "استرداد HTML والأصول"),
+        ("تحليل البنية", "فهم التخطيط والمكونات"),
+        ("إعادة البناء", "إنشاء نسخة Tailwind نظيفة"),
+    ],
+    "research": [
+        ("تخطيط البحث", "تحديد استراتيجية البحث والاستعلامات"),
+        ("البحث في الويب", "تشغيل استعلامات البحث"),
+        ("تحليل المصادر", "قراءة وتقييم المحتوى"),
+        ("نقد المحتوى", "التحقق من الثقة والملاءمة"),
+        ("التوليف النهائي", "صياغة إجابة موثقة"),
+    ],
+}
+
+
 router = APIRouter(prefix="/api", tags=["chat"])
 
 
@@ -59,6 +122,8 @@ class ChatRequest(BaseModel):
     locale: str = "ar"
     # Frontend conversation ID — used for context tracking.
     conversation_id: str | None = None
+    # Conversation history context passed from frontend.
+    history: list[dict[str, str]] = Field(default_factory=list)
 
 
 class ChatResponse(BaseModel):
@@ -138,8 +203,22 @@ _TOOL_TO_INTENT: dict[str, str] = {
 # ── Single-skill dispatch ───────────────────────────────────────────────────
 
 
+def _format_history_context(history: list[dict]) -> str:
+    """Format conversation history as a prefix for LLM skill prompts."""
+    if not history:
+        return ""
+    lines = ["[سياق المحادثة السابقة]"]
+    for msg in history[-12:]:
+        role = "المستخدم" if msg.get("role") == "user" else "المساعد"
+        content = (msg.get("content") or "")[:500]
+        lines.append(f"{role}: {content}")
+    lines.append("[نهاية السياق]\n")
+    return "\n".join(lines)
+
+
 def _dispatch_single(intent_kind: str, message: str, url: str | None,
-                     params: dict[str, Any]) -> str:
+                     params: dict[str, Any],
+                     history: list[dict] | None = None) -> str:
     """Submit a single skill task via TaskManager. Returns task_id.
 
     Mirrors the dispatch logic in src/api/main.py::_dispatch_skill_intent —
@@ -148,9 +227,13 @@ def _dispatch_single(intent_kind: str, message: str, url: str | None,
     if intent_kind == "research":
         from ...core.agent import Agent
 
+        _hist_ctx = _format_history_context(history) if history else ""
+        _goal_with_ctx = f"{_hist_ctx}\nالهدف الحالي: {message}" if _hist_ctx else message
+
         async def _factory(_tid: str):
+            await _emit_task_plan(_tid, _SKILL_PHASES["research"])
             async with Agent() as agent:
-                result = await agent.run(message, task_id=_tid)
+                result = await agent.run(_goal_with_ctx, task_id=_tid)
             r = result.to_dict()
             await _emit_skill_result(_tid, {
                 "skill": "research",
@@ -165,6 +248,7 @@ def _dispatch_single(intent_kind: str, message: str, url: str | None,
         from ...skills.explore import explore as _explore_skill
 
         async def _explore_factory(_tid: str):
+            await _emit_task_plan(_tid, _SKILL_PHASES["explore"])
             er = await _explore_skill(url or "", params.get("depth_hint") or "thorough")
             result = {"site": er.site, "report": er.report, "report_path": er.report_path}
             await _emit_skill_result(_tid, {
@@ -181,17 +265,29 @@ def _dispatch_single(intent_kind: str, message: str, url: str | None,
         from ...skills.clone import clone as _clone_skill
 
         async def _clone_factory(_tid: str):
+            await _emit_task_plan(_tid, _SKILL_PHASES["clone"])
             cr = await _clone_skill(url or "", max_assets=int(params.get("max_assets") or 60))
             result = {
-                "url": cr.url, "raw_dir": cr.raw_dir,
-                "rebuilt_html_path": cr.rebuilt_html_path, "assets": cr.assets,
+                "url": cr.url,
+                "out_dir": cr.out_dir,
+                "index_html_path": cr.index_html_path,
+                "raw_dir": cr.raw_dir,
+                "media_count": cr.media_count,
+                "css_count": cr.css_count,
+                "js_count": cr.js_count,
+                "library_swaps": cr.library_swaps,
+                "dropped_count": len(cr.dropped_assets),
             }
             await _emit_skill_result(_tid, {
                 "skill": "clone",
                 "url": cr.url,
-                "rebuilt_html_path": cr.rebuilt_html_path,
-                "assets_count": len(cr.assets),
-                "summary_ar": f"تم استنساخ {cr.url} — {len(cr.assets)} ملف",
+                "index_html_path": cr.index_html_path,
+                "media_count": cr.media_count,
+                "summary_ar": (
+                    f"تم استنساخ {cr.url} — {cr.media_count} وسائط، "
+                    f"{cr.css_count} CSS، {cr.js_count} JS، "
+                    f"{len(cr.library_swaps)} مكتبات مُستبدَلة"
+                ),
             })
             return result
         return task_manager.submit("clone", {"goal": message, "url": url}, _clone_factory).task_id
@@ -272,8 +368,12 @@ def _dispatch_single(intent_kind: str, message: str, url: str | None,
     if intent_kind == "md_writer":
         from ...skills.md_writer import md_writer as _md_writer_skill
 
+        _md_ctx = _format_history_context(history) if history else ""
+        _md_goal = f"{_md_ctx}\nالهدف الحالي: {message}" if _md_ctx else message
+
         async def _md_writer_factory(_tid: str):
-            r = await _md_writer_skill(message)
+            await _emit_task_plan(_tid, _SKILL_PHASES["md_writer"])
+            r = await _md_writer_skill(_md_goal)
             result = {"content": r.content, "filename": r.filename, "path": r.path, "word_count": r.word_count}
             await _emit_skill_result(_tid, {
                 "skill": "md_writer",
@@ -286,8 +386,11 @@ def _dispatch_single(intent_kind: str, message: str, url: str | None,
     if intent_kind == "html_artifact":
         from ...skills.html_artifact import html_artifact as _html_skill
 
+        _html_ctx = _format_history_context(history) if history else ""
+
         async def _html_factory(_tid: str):
-            r = await _html_skill(message)
+            await _emit_task_plan(_tid, _SKILL_PHASES["html_artifact"])
+            r = await _html_skill(message, context=_html_ctx)
             result = {"content": r.content, "filename": r.filename, "path": r.path}
             await _emit_skill_result(_tid, {
                 "skill": "html_artifact",
@@ -315,6 +418,7 @@ def _dispatch_single(intent_kind: str, message: str, url: str | None,
         from ...skills.mermaid_diagram import mermaid_diagram as _mermaid_skill
 
         async def _mermaid_factory(_tid: str):
+            await _emit_task_plan(_tid, _SKILL_PHASES["mermaid_diagram"])
             r = await _mermaid_skill(message)
             result = {"content": r.content, "diagram_type": r.diagram_type, "filename": r.filename, "path": r.path}
             await _emit_skill_result(_tid, {
@@ -344,6 +448,7 @@ def _dispatch_single(intent_kind: str, message: str, url: str | None,
         from ...skills.summarize import summarize as _summarize_skill
 
         async def _summarize_factory(_tid: str):
+            await _emit_task_plan(_tid, _SKILL_PHASES["summarize"])
             r = await _summarize_skill(message, goal=message)
             result = {
                 "summary_ar": r.summary_ar,
@@ -362,6 +467,7 @@ def _dispatch_single(intent_kind: str, message: str, url: str | None,
         from ...skills.translate import translate as _translate_skill
 
         async def _translate_factory(_tid: str):
+            await _emit_task_plan(_tid, _SKILL_PHASES["translate"])
             r = await _translate_skill(message, target_lang=params.get("target_lang") or "")
             result = {
                 "original": r.original,
@@ -380,8 +486,12 @@ def _dispatch_single(intent_kind: str, message: str, url: str | None,
     if intent_kind == "competitor_matrix":
         from ...skills.competitor_matrix import competitor_matrix as _matrix_skill
 
+        _matrix_ctx = _format_history_context(history) if history else ""
+        _matrix_goal = f"{_matrix_ctx}\nالهدف الحالي: {message}" if _matrix_ctx else message
+
         async def _matrix_factory(_tid: str):
-            r = await _matrix_skill(message)
+            await _emit_task_plan(_tid, _SKILL_PHASES["competitor_matrix"])
+            r = await _matrix_skill(_matrix_goal)
             result = {
                 "competitors": r.competitors,
                 "features": r.features,
@@ -401,9 +511,13 @@ def _dispatch_single(intent_kind: str, message: str, url: str | None,
     # Default fallback — research.
     from ...core.agent import Agent as _AgentFallback
 
+    _fb_ctx = _format_history_context(history) if history else ""
+    _fb_goal = f"{_fb_ctx}\nالهدف الحالي: {message}" if _fb_ctx else message
+
     async def _fallback_factory(_tid: str):
+        await _emit_task_plan(_tid, _SKILL_PHASES["research"])
         async with _AgentFallback() as agent:
-            result = await agent.run(message, task_id=_tid)
+            result = await agent.run(_fb_goal, task_id=_tid)
         r = result.to_dict()
         await _emit_skill_result(_tid, {
             "skill": "research",
@@ -423,20 +537,29 @@ class _FakeRunBody:
 # ── Pipeline step runner ────────────────────────────────────────────────────
 
 
-async def _pipeline_step_runner(skill: str, params: dict[str, Any]) -> dict[str, Any]:
-    """Run one pipeline step synchronously (inside the orchestrator's run())
-    and wait for it to finish, then return its result dict.
+async def _pipeline_step_runner(
+    skill: str,
+    params: dict[str, Any],
+    on_task_id: Any = None,
+) -> dict[str, Any]:
+    """Run one pipeline step and wait for it to finish, returning its result.
 
-    The orchestrator yields events; the API layer streams them through the
-    pipeline's task_id channel on the event bus.
+    `on_task_id` is an optional callable(task_id: str) — it is called
+    synchronously as soon as the task is dispatched so the orchestrator can
+    include the task_id in PIPELINE_STEP_START before awaiting completion.
     """
-    # We re-use _dispatch_single to get a task_id, then await its completion.
-    # This makes pipeline steps fully observable on the existing /ws/<task_id>
-    # channel — no new transport needed.
     intent_kind = skill
     url = params.get("url") or params.get("site_url")
-    task_id = _dispatch_single(intent_kind, params.get("goal") or params.get("message") or "",
-                               url, params)
+    task_id = _dispatch_single(
+        intent_kind,
+        params.get("goal") or params.get("message") or "",
+        url,
+        params,
+    )
+    # Notify orchestrator of the task_id immediately (synchronous, pre-await).
+    if callable(on_task_id):
+        on_task_id(task_id)
+
     # Wait for the task to finish.
     while True:
         rec = task_manager.get(task_id)
@@ -482,8 +605,23 @@ async def chat(body: ChatRequest) -> ChatResponse:
             log.warning("No LLM provider available; using rule fallback: %s", exc)
             provider = None  # type: ignore[assignment]
 
-        conv = Conversation(provider, locale=body.locale)
-        conv_result = await conv.handle(body.message)
+        conv = Conversation(provider, locale=body.locale, history=body.history)
+        try:
+            conv_result = await conv.handle(body.message)
+        except Exception as exc:
+            log.exception("Conversation orchestrator failed")
+            err_str = str(exc).lower()
+            if "401" in err_str or "unauthorized" in err_str or "auth" in err_str or "api_key" in err_str:
+                if body.locale == "ar":
+                    msg = "خطأ في المصادقة: مفتاح API الخاص بـ Mistral غير صحيح أو غير متوفر في ملف .env. يرجى التحقق من MISTRAL_API_KEY."
+                else:
+                    msg = "Authentication failed: Mistral API key is incorrect or missing in your .env file. Please check MISTRAL_API_KEY."
+            else:
+                if body.locale == "ar":
+                    msg = f"عذراً، حدث خطأ أثناء معالجة طلبك: {exc}"
+                else:
+                    msg = f"Sorry, an error occurred while processing your request: {exc}"
+            return ChatResponse(mode="chat", reply_text=msg)
 
         if conv_result.kind == "text":
             return ChatResponse(mode="chat", reply_text=conv_result.text)
@@ -541,7 +679,7 @@ async def chat(body: ChatRequest) -> ChatResponse:
             confirmed = True
         if confirmed:
             try:
-                pipeline = await orch.plan(body.message, locale=body.locale)
+                pipeline = await orch.plan(body.message, locale=body.locale, history=body.history)
             except Exception as exc:  # noqa: BLE001
                 log.warning(f"orchestrator.plan failed: {exc}")
                 pipeline = None
@@ -558,7 +696,7 @@ async def chat(body: ChatRequest) -> ChatResponse:
 
     # ── 4. Single-skill dispatch ──────────────────────────────────────
     try:
-        task_id = _dispatch_single(kind, body.message, intent.url, dict(intent.params))
+        task_id = _dispatch_single(kind, body.message, intent.url, dict(intent.params), history=body.history)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(500, detail=f"تعذّر تشغيل المهارة: {exc}") from exc
     return ChatResponse(mode="single", task_id=task_id, intent=kind)

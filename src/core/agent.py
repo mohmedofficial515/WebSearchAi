@@ -32,6 +32,7 @@ from .agent_helpers import (  # noqa: F401 — re-exported for back-compat
 from .agent_persistence import archive_task, get_memory_context, save_memory
 from .browser import BrowserSession
 from .executor import Executor
+from .harvester import PageHarvester
 from .perception import Perception
 from .planner import Plan, Planner
 from .search_agent import SearchAgent
@@ -78,9 +79,17 @@ class Agent:
         # Search-first orchestrator. Pure-LLM + search-API, no browser.
         # The browser visit step is still driven from this Agent class.
         self.search_agent = SearchAgent(self.llm)
+        # Parallel page-content extractor. Fetches pages over HTTP
+        # in parallel (~10x faster than driving the main browser tab),
+        # and falls back to the browser only for JS-only / anti-bot pages.
+        self.harvester = PageHarvester()
 
     async def __aenter__(self) -> "Agent":
-        await self.session.start()
+        # Don't start the browser eagerly. For search-first tasks the LLM
+        # planning + search-API phase runs entirely without a browser, so
+        # opening Chrome immediately would leave it on about:blank for the
+        # entire planning period (10-30 s). The browser is started lazily
+        # on the first actual goto() / screenshot() call instead.
         self.tab_manager = TabManager(self.session)
         self.executor = Executor(self.session, tab_manager=self.tab_manager)
         return self
@@ -471,6 +480,12 @@ class Agent:
         async def _on_event(type_: str, data: dict) -> None:
             await self._emit(task_id, type_, data, tab_id=tab_id)
 
+        # Keep the original user goal pristine. The previous implementation
+        # mutated it by appending "| retry-angles: …" each re-search round,
+        # which fed back into the query generator and produced 500-char
+        # bloated queries that broke every SERP. We now pass the critic's
+        # `new_queries` to research() via `seed_queries` instead.
+        original_goal = goal
         all_queries: list[str] = []
         all_visited: list[str] = []  # URLs we tried to goto
         dead_hosts: set[str] = set()
@@ -486,6 +501,7 @@ class Agent:
         max_re_search = max(0, settings.research_max_re_search)
 
         avoid_queries: set[str] = set()
+        next_seed_queries: list[str] | None = None
 
         for round_idx in range(max_re_search + 1):
             await self._emit(task_id, "research_round",
@@ -493,11 +509,13 @@ class Agent:
                              tab_id=tab_id)
 
             plan_research = await self.search_agent.research(
-                goal=goal,
+                goal=original_goal,
                 avoid_hosts=dead_hosts,
                 avoid_queries=avoid_queries,
+                seed_queries=next_seed_queries,
                 on_event=_on_event,
             )
+            next_seed_queries = None  # one-shot — only used the round it was set
             all_queries.extend(q for q in plan_research.queries if q not in all_queries)
             avoid_queries.update(plan_research.queries)
             all_candidates_seen.extend(c.to_dict() for c in plan_research.candidates)
@@ -512,112 +530,135 @@ class Agent:
                     # else fall through to re-search decision below
                 # try the re-search step
             else:
-                # ── Visit + judge loop ──────────────────────────────
+                # ── Specialized parallel layers ────────────────────────
+                # Layer 1 (PageHarvester): fetch every shortlisted page in
+                # parallel via HTTP, fall back to the real browser only for
+                # JS-heavy or anti-bot pages.
+                # Layer 2 (parallel EvidenceJudge): score every fetched
+                # page in parallel via the critic. Was previously serial,
+                # so 6 candidates burned ~30 s of LLM latency end-to-end.
+                #
+                # We pre-filter for dead_hosts / already-visited URLs here
+                # (the old loop did this inline). What survives goes into
+                # one parallel harvest + one parallel judge batch.
+                fresh_candidates = []
                 for candidate in plan_research.visit_queue:
-                    if len(useful_sources) >= min_useful:
-                        break
-                    step_idx += 1
                     url = candidate.url
                     host = candidate.host or _host_of(url)
                     if host and host in dead_hosts:
                         continue
                     if url in all_visited:
                         continue
+                    fresh_candidates.append(candidate)
                     all_visited.append(url)
 
-                    await self._emit(task_id, "candidate_selected", {
-                        "step": step_idx,
-                        "url": url,
-                        "title": candidate.title,
-                        "final_score": candidate.final_score,
-                        "reason": candidate.llm_reason,
-                    }, tab_id=tab_id)
-
-                    # ── 5a. visit ─────────────────────────────────
-                    goto_ok = True
-                    goto_note = ""
-                    try:
-                        await self.session.goto(url)
-                    except Exception as exc:  # noqa: BLE001
-                        goto_ok = False
-                        goto_note = str(exc)[:240]
-                        if _is_network_error(goto_note) and host:
-                            dead_hosts.add(host)
-                        why_not_parts.append(f"goto {url!r}: {goto_note[:120]}")
-
-                    if not goto_ok:
-                        visit_log.append({
+                if fresh_candidates:
+                    # Emit candidate_selected for each up-front so the UI
+                    # shows the full visit queue immediately rather than
+                    # one-at-a-time as in the old serial loop.
+                    for candidate in fresh_candidates:
+                        step_idx += 1
+                        await self._emit(task_id, "candidate_selected", {
                             "step": step_idx,
-                            "action": {"action": "goto", "url": url},
-                            "ok": False,
-                            "note": goto_note,
-                        })
-                        await self._emit(task_id, "action_result",
-                                         {"step": step_idx, "ok": False, "note": goto_note},
-                                         tab_id=tab_id)
-                        continue
-
-                    visit_log.append({
-                        "step": step_idx,
-                        "action": {"action": "goto", "url": url},
-                        "ok": True,
-                        "note": f"navigated to {url}",
-                    })
-
-                    # ── 5b. screenshot + extract ────────────────────
-                    try:
-                        snap = await self.perception.snapshot(include_screenshot=self.use_vision)
-                        if snap.screenshot_bytes:
-                            (artifacts / f"step_{step_idx:03d}.png").write_bytes(snap.screenshot_bytes)
-                        await self._emit(task_id, "perception", {
-                            "step": step_idx,
-                            "url": snap.url,
-                            "title": snap.title,
-                            "n_elements": len(snap.elements),
+                            "url": candidate.url,
+                            "title": candidate.title,
+                            "final_score": candidate.final_score,
+                            "reason": candidate.llm_reason,
                         }, tab_id=tab_id)
-                    except Exception as exc:  # noqa: BLE001
-                        log.debug(f"perception failed on {url}: {exc}")
+
+                    # ── Parallel HTTP harvest (browser-fallback for thin pages) ──
+                    targets = [
+                        {"url": c.url, "title": c.title} for c in fresh_candidates
+                    ]
+                    pages = await self.harvester.harvest_many(
+                        targets, browser_fallback=self.session,
+                    )
 
                     extract_chars = int(getattr(settings, "research_extract_chars", 14000))
-                    try:
-                        raw = await self.session.eval_js("document.body.innerText")
-                        page_text = str(raw or "")[:extract_chars]
-                    except Exception as exc:  # noqa: BLE001
-                        page_text = ""
-                        why_not_parts.append(f"extract {url!r}: {exc!s:.120}")
+                    for c, page in zip(fresh_candidates, pages):
+                        step_idx += 1
+                        host = c.host or _host_of(c.url)
+                        if page.ok:
+                            visit_log.append({
+                                "step": step_idx,
+                                "action": {"action": "goto", "url": c.url},
+                                "ok": True,
+                                "note": f"harvested via {page.source} ({len(page.text)} chars)",
+                            })
+                            await self._emit(task_id, "action_result",
+                                             {"step": step_idx, "ok": True,
+                                              "note": f"harvested via {page.source}"},
+                                             tab_id=tab_id)
+                            extractions.append(page.text[: max(4000, extract_chars // 2)])
+                        else:
+                            note = page.error or "harvest returned no text"
+                            visit_log.append({
+                                "step": step_idx,
+                                "action": {"action": "goto", "url": c.url},
+                                "ok": False,
+                                "note": note,
+                            })
+                            await self._emit(task_id, "action_result",
+                                             {"step": step_idx, "ok": False, "note": note},
+                                             tab_id=tab_id)
+                            why_not_parts.append(f"{c.url}: {note[:120]}")
+                            if _is_network_error(note) and host:
+                                dead_hosts.add(host)
 
-                    if page_text:
-                        extractions.append(page_text[: max(4000, extract_chars // 2)])
-
-                    # ── 5c. content critic ──────────────────────────
-                    step_idx += 1
-                    verdict = await self.search_agent.judge_content(goal, url, page_text)
-                    await self._emit(task_id, "content_critiqued", {
-                        "step": step_idx,
-                        "url": url,
-                        "score": verdict.score,
-                        "verdict": verdict.verdict,
-                        "useful_facts": verdict.useful_facts,
-                    }, tab_id=tab_id)
-                    visit_log.append({
-                        "step": step_idx,
-                        "action": {"action": "judge_content", "url": url},
-                        "ok": True,
-                        "note": f"score={verdict.score:.2f} — {verdict.verdict}",
-                    })
-
-                    if verdict.score >= threshold and verdict.useful_facts:
-                        useful_sources.append({
-                            "url": url,
-                            "title": candidate.title,
-                            "verdict": verdict.verdict,
-                            "useful_facts": verdict.useful_facts,
-                            "score": verdict.score,
-                        })
-                    else:
-                        why_not_parts.append(
-                            f"{url}: score={verdict.score:.2f} — {verdict.verdict or 'low relevance'}"
+                    # ── Parallel EvidenceJudge (content critic) ────────────
+                    judgeable = [
+                        (c, p) for c, p in zip(fresh_candidates, pages) if p.ok
+                    ]
+                    if judgeable:
+                        verdicts = await asyncio.gather(
+                            *[self.search_agent.judge_content(original_goal, c.url, p.text)
+                              for c, p in judgeable],
+                            return_exceptions=True,
                         )
+                        for (c, p), verdict in zip(judgeable, verdicts):
+                            step_idx += 1
+                            if isinstance(verdict, BaseException):
+                                err = f"{type(verdict).__name__}: {verdict!s:.120}"
+                                why_not_parts.append(f"judge {c.url}: {err}")
+                                visit_log.append({
+                                    "step": step_idx,
+                                    "action": {"action": "judge_content", "url": c.url},
+                                    "ok": False,
+                                    "note": err,
+                                })
+                                continue
+                            await self._emit(task_id, "content_critiqued", {
+                                "step": step_idx,
+                                "url": c.url,
+                                "score": verdict.score,
+                                "verdict": verdict.verdict,
+                                "useful_facts": verdict.useful_facts,
+                            }, tab_id=tab_id)
+                            visit_log.append({
+                                "step": step_idx,
+                                "action": {"action": "judge_content", "url": c.url},
+                                "ok": True,
+                                "note": f"score={verdict.score:.2f} — {verdict.verdict}",
+                            })
+                            if verdict.score >= threshold and verdict.useful_facts:
+                                useful_sources.append({
+                                    "url": c.url,
+                                    "title": c.title,
+                                    "verdict": verdict.verdict,
+                                    "useful_facts": verdict.useful_facts,
+                                    "score": verdict.score,
+                                })
+                                if len(useful_sources) >= min_useful:
+                                    # Enough useful sources — we still
+                                    # finish logging the remaining
+                                    # already-completed verdicts for
+                                    # observability, but won't keep
+                                    # collecting more.
+                                    pass
+                            else:
+                                why_not_parts.append(
+                                    f"{c.url}: score={verdict.score:.2f} — {verdict.verdict or 'low relevance'}"
+                                )
 
             # Enough? bail before doing another search round.
             if len(useful_sources) >= min_useful:
@@ -629,7 +670,7 @@ class Agent:
 
             # ── Re-search decision ──────────────────────────────────
             decision = await self.search_agent.decide_re_search(
-                goal=goal,
+                goal=original_goal,
                 queries_tried=all_queries,
                 urls_visited=all_visited,
                 useful_facts=[f for s in useful_sources for f in s.get("useful_facts", [])],
@@ -638,22 +679,33 @@ class Agent:
             await self._emit(task_id, "re_search_decision", decision.to_dict(), tab_id=tab_id)
             if not decision.should_re_search or not decision.new_queries:
                 break
-            # Seed the next round: critic-proposed queries get priority,
-            # already-tried queries are blocked via `avoid_queries`.
+            # Seed the next round with the critic's proposed queries
+            # VERBATIM (no goal mutation — see original_goal note above).
+            # Already-tried queries are blocked via `avoid_queries` so
+            # the same angle can't get picked twice.
             avoid_queries.update(all_queries)
-            # The next research() call will run its own query generator;
-            # we splice the critic's new queries in by temporarily
-            # monkey-injecting them via avoid_queries (negative) and a
-            # one-shot override on the orchestrator's generator. The
-            # simplest robust path: pre-seed `avoid_queries` so the
-            # generator must produce different angles, and pass the
-            # critic's queries by appending them to the goal hint.
-            goal_hint = goal + " | retry-angles: " + " ; ".join(decision.new_queries[:3])
-            goal = goal_hint  # next round uses the broader hint
+            next_seed_queries = list(decision.new_queries)
 
         # ── Synthesize ────────────────────────────────────────────────
-        synth = await self.search_agent.synthesize(goal, useful_sources)
-        await self._emit(task_id, "synthesis_done", synth.to_dict(), tab_id=tab_id)
+        synth = await self.search_agent.synthesize(original_goal, useful_sources)
+        # The frontend `synthesis_done` handler expects `{synthesis, sources}`.
+        # synth.to_dict() gives us {answer, citations, …} — merge in the
+        # missing keys so the typed contract holds. Without `sources` here,
+        # `stream.sources` becomes `undefined` and the chat page crashes
+        # with the classic "Cannot read .length of undefined" white screen.
+        synth_payload = {
+            **synth.to_dict(),
+            "synthesis": synth.answer,
+            "sources": [
+                {
+                    "url": s.get("url", ""),
+                    "title": s.get("title", ""),
+                    "snippet": (s.get("verdict") or "")[:200],
+                }
+                for s in useful_sources
+            ],
+        }
+        await self._emit(task_id, "synthesis_done", synth_payload, tab_id=tab_id)
 
         # Honest outcome instead of the old silent "(no answer)" string.
         # The UI branches on `outcome` to show green/amber/red — we no

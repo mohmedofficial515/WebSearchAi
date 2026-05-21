@@ -16,8 +16,23 @@ class Settings(BaseSettings):
     )
 
     # ── LLM provider ─────────────────────────────────────────────────────────
-    # auto | mistral | openai | anthropic | groq | gemini | cohere | openrouter | ollama
+    # auto | deepseek | chatgpt | mistral | openai | anthropic | groq | gemini | cohere | openrouter | ollama
+    # `auto` prefers DeepSeek (web-protocol bridge) when DEEPSEEK_USER_TOKEN
+    # is set, then falls through the API-key providers.
     llm_provider: str = "auto"
+
+    # DeepSeek — web protocol via ai-providers-direct (Bearer + PoW + SSE).
+    # Get a token by running `npm run token:refresh:headed` inside
+    # ../ai-providers-direct (one-time sign-in opens a Chrome window).
+    deepseek_user_token: str = ""
+    deepseek_thinking: bool = False
+
+    # ChatGPT — web protocol via ai-providers-direct (Playwright + persistent
+    # Chrome profile). No token; auth comes from the Chrome profile created
+    # by `npm run chatgpt:setup` (run once inside ../ai-providers-direct).
+    # `chatgpt_model` accepts the server's slugs: "auto" lets ChatGPT pick
+    # (matches the webapp default for free accounts), or e.g. "gpt-5".
+    chatgpt_model: str = "auto"
 
     # Mistral — https://console.mistral.ai  (free trial credits)
     mistral_api_key: str = ""

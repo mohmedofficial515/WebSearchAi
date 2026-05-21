@@ -18,6 +18,7 @@ that contradiction. Trust the patches.
 
 from __future__ import annotations
 
+import asyncio
 import random
 import shutil
 from dataclasses import dataclass, field
@@ -64,6 +65,12 @@ def _chrome_is_installed() -> bool:
     return False
 
 
+# Global lock for the default persistent "browser_profile" folder to prevent
+# exitCode=21 crashes when multiple skills try to acquire the same Playwright
+# persistent context lock concurrently. Instantiated lazily.
+_PROFILE_LOCK: asyncio.Semaphore | None = None
+
+
 @dataclass
 class BrowserSession:
     """Owns one patchright stack + page; safe to use across the agent loop."""
@@ -76,8 +83,16 @@ class BrowserSession:
     _browser: Browser | None = None
     _context: BrowserContext | None = None
     page: Page | None = None
+    _started: bool = field(default=False, init=False, repr=False)
+
+    async def _ensure_started(self) -> None:
+        """Lazy-start: call start() only on first actual browser use."""
+        if not self._started:
+            await self.start()
 
     async def start(self) -> None:
+        if self._started:
+            return
         self._pw = await async_playwright().start()
         engine = getattr(self._pw, self.browser_type)
         viewport = {
@@ -111,8 +126,20 @@ class BrowserSession:
         # Persistent context = a real on-disk Chrome profile. Cookies,
         # MUID, captcha-pass history etc. survive between runs. Bing
         # in particular weights this heavily in its trust score.
+        is_default_profile = False
         if self.user_data_dir is None:
             self.user_data_dir = (settings.output_path / "browser_profile").resolve()
+            is_default_profile = True
+        elif self.user_data_dir.name == "browser_profile":
+            is_default_profile = True
+
+        if is_default_profile:
+            global _PROFILE_LOCK
+            if _PROFILE_LOCK is None:
+                _PROFILE_LOCK = asyncio.Semaphore(1)
+            await _PROFILE_LOCK.acquire()
+            self._holds_profile_lock = True
+
         self.user_data_dir.mkdir(parents=True, exist_ok=True)
 
         context_kwargs: dict[str, Any] = {
@@ -153,6 +180,7 @@ class BrowserSession:
         # beforeunload dialog will freeze the agent loop forever.
         self.page.on("dialog", lambda d: d.dismiss())
 
+        self._started = True
         log.info(
             f"🌐 patchright started "
             f"(channel={'chrome' if use_chrome else 'chromium'}, "
@@ -160,6 +188,8 @@ class BrowserSession:
         )
 
     async def stop(self) -> None:
+        if not self._started:
+            return
         try:
             if self._context:
                 await self._context.close()
@@ -169,6 +199,10 @@ class BrowserSession:
                 await self._pw.stop()
         finally:
             self._pw = self._browser = self._context = self.page = None
+            self._started = False
+            if getattr(self, "_holds_profile_lock", False) and _PROFILE_LOCK is not None:
+                _PROFILE_LOCK.release()
+                self._holds_profile_lock = False
             log.info("🛑 Browser stopped")
 
     # ------------------------------------------------------------------
@@ -180,6 +214,7 @@ class BrowserSession:
         url: str,
         wait_until: Literal["commit", "domcontentloaded", "load", "networkidle"] | None = "load",
     ) -> None:
+        await self._ensure_started()
         assert self.page
         log.info(f"➡️  goto {url}")
         await self.page.goto(url, wait_until=wait_until)
@@ -222,6 +257,7 @@ class BrowserSession:
         )
 
     async def screenshot(self, path: str | Path | None = None) -> bytes:
+        await self._ensure_started()
         assert self.page
         return await self.page.screenshot(
             path=str(path) if path else None, full_page=False

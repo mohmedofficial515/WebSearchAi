@@ -91,7 +91,11 @@ function reducer(state: TaskStreamState, action: Action): TaskStreamState {
       return { ...state, steps: updated };
     }
     case 'SOURCES':
-      return { ...state, sources: action.sources };
+      // Defensive: backend contracts drift; never let an undefined / non-array
+      // payload land in state. A missing `sources` here used to crash the
+      // chat page with "Cannot read .length of undefined" the moment
+      // synthesis_done arrived → white screen until reload.
+      return { ...state, sources: Array.isArray(action.sources) ? action.sources : [] };
     case 'SUGGESTIONS':
       return { ...state, continuationSuggestions: action.suggestions };
     case 'SKILL_RESULT':
@@ -152,9 +156,14 @@ export function useTaskStream(taskId: string | null): TaskStreamState {
         if (ev.data.screenshot) dispatch({ type: 'SCREENSHOT', screenshot: ev.data.screenshot });
         break;
 
-      case 'synthesis_done':
-        dispatch({ type: 'SOURCES', sources: ev.data.sources });
+      case 'synthesis_done': {
+        // Older backend builds emitted `synth.to_dict()` directly (no `sources`
+        // key); newer ones include `sources: Source[]`. Accept both shapes.
+        const raw = (ev.data as unknown as Record<string, unknown>).sources;
+        const sources = Array.isArray(raw) ? (raw as Source[]) : [];
+        dispatch({ type: 'SOURCES', sources });
         break;
+      }
 
       case 'skill_result':
         dispatch({ type: 'SKILL_RESULT', data: ev.data });

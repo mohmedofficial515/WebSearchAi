@@ -5,6 +5,7 @@ import { Composer, type ComposerHandle } from '@/components/chat/Composer';
 import { useTaskStream } from '@/hooks/useTaskStream';
 import { useTasksStore } from '@/stores/tasksStore';
 import { useConversationsStore } from '@/stores/conversationsStore';
+import { useSavedDesignsStore } from '@/stores/savedDesignsStore';
 import { estimateTokens } from '@/lib/tokens';
 import type { Message } from '@/lib/types';
 import { apiPost } from '@/lib/api';
@@ -29,6 +30,7 @@ export default function ChatPage() {
     updateTotalTokens,
     deleteConversation,
   } = useConversationsStore();
+  const { addDesign } = useSavedDesignsStore();
 
   const activeConversation = conversations.find((c) => c.id === activeId);
   const messages = activeConversation?.messages ?? [];
@@ -73,6 +75,28 @@ export default function ChatPage() {
       return () => clearTimeout(t);
     }
   }, [liveTaskId, drawerStream.status]);
+
+  // Auto-save html_artifact results to the saved-designs sidebar list.
+  useEffect(() => {
+    const sr = drawerStream.skillResult;
+    if (
+      drawerStream.status === 'succeeded' &&
+      sr?.skill === 'html_artifact' &&
+      liveTaskId &&
+      typeof sr.content === 'string' &&
+      typeof sr.filename === 'string'
+    ) {
+      const filename = sr.filename as string;
+      // Turn "أنشئ_صفحة_ERP_1748000000" → "أنشئ صفحة ERP"
+      const name = filename.replace(/_\d+\.html$/, '').replace(/_/g, ' ').trim();
+      addDesign({
+        name: name || filename,
+        filename,
+        content: sr.content as string,
+        taskId: liveTaskId,
+      });
+    }
+  }, [drawerStream.status, drawerStream.skillResult, liveTaskId, addDesign]);
 
   // Fix 3: never create an empty conversation on "New Chat".
   // Only create one when the first message is submitted.
@@ -123,9 +147,15 @@ export default function ChatPage() {
       updateTotalTokens(convId, userTokens);
 
       try {
+        const history = messages.slice(-20).map((m) => ({
+          role: m.role,
+          content: m.text,
+        }));
+
         const body: Record<string, unknown> = {
           message: text,
           conversation_id: convId,
+          history,
         };
         if (skillOverride) body.force_skill = skillOverride;
         const doneAttachments = (_attachments ?? []).filter((a) => a.status === 'done' && a.url);

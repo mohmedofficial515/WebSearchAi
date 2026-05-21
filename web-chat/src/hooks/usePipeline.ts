@@ -143,34 +143,43 @@ export function usePipeline(
   const handleEvent = useCallback((ev: WsEvent) => {
     switch (ev.type) {
       case 'pipeline_plan': {
-        const d = ev.data;
-        const rawSteps = ((d.steps as unknown) as Record<string, unknown>[]) ?? [];
+        const d = ev.data as Record<string, unknown>;
+        const rawSteps = (d.steps as Record<string, unknown>[]) ?? [];
         dispatch({
           type: 'INIT_PLAN',
           goal: String(d.goal ?? ''),
-          summaryAr: String(d.goal ?? ''),
-          needsApproval: Boolean(d.fan_out_cap),
+          summaryAr: String(d.summary_ar ?? d.goal ?? ''),
+          needsApproval: Boolean(d.needs_approval),
           steps: rawSteps.map((s) => stepFromDict(s as Record<string, unknown>)),
         });
         break;
       }
-      case 'pipeline_step_start':
+      case 'pipeline_step_start': {
+        const d = ev.data as Record<string, unknown>;
         dispatch({
           type: 'STEP_START',
-          step_id: ev.data.step_id,
-          task_id: ev.data.task_id,
+          step_id: String(d.step_id ?? ''),
+          task_id: String(d.task_id ?? ''),
         });
         break;
-      case 'pipeline_step_end':
+      }
+      case 'pipeline_step_end': {
+        const d = ev.data as Record<string, unknown>;
+        // Backend may send `ok: bool` (old) or `status: string` (new) — handle both.
+        const rawStatus = d.status;
+        const ok = d.ok;
+        const stepStatus: 'done' | 'failed' | 'skipped' =
+          rawStatus === 'done' || rawStatus === 'failed' || rawStatus === 'skipped'
+            ? rawStatus as 'done' | 'failed' | 'skipped'
+            : ok === true ? 'done' : ok === false ? 'failed' : 'done';
         dispatch({
           type: 'STEP_END',
-          step_id: ev.data.step_id,
-          status: ev.data.status,
-          error: typeof (ev.data as Record<string, unknown>).error === 'string'
-            ? (ev.data as Record<string, unknown>).error as string
-            : undefined,
+          step_id: String(d.step_id ?? ''),
+          status: stepStatus,
+          error: typeof d.error === 'string' ? d.error : undefined,
         });
         break;
+      }
       case 'pipeline_paused':
         dispatch({
           type: 'PAUSED',
@@ -184,11 +193,13 @@ export function usePipeline(
       case 'pipeline_end': {
         doneRef.current = true;
         const d = ev.data as Record<string, unknown>;
+        // Backend may send `ok: bool` (old) or `status: string` (new) — handle both.
+        const isDone = d.status === 'done' || d.ok === true;
         dispatch({
           type: 'DONE',
           summaryAr: String(d.summary_ar ?? ''),
           artifacts: (d.artifacts as ArtifactMeta[]) ?? [],
-          ok: d.status === 'done',
+          ok: isDone,
         });
         wsRef.current?.close();
         break;

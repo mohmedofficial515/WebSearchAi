@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "ai-providers-direct": "file:../ai-providers-direct",
     "playwright": "^1.60.0"
   }
 }

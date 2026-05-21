@@ -25,6 +25,12 @@ ROOT = Path(__file__).resolve().parent.parent.parent.parent
 
 # Model metadata: stars (1-5), speed (fast/medium/slow/local), vision support
 _MODEL_META: dict[str, dict] = {
+    # ── ChatGPT (web protocol) ──
+    "auto":                            {"stars": 4, "speed": "medium", "vision": False, "ctx_k": 32},
+    "gpt-5":                           {"stars": 5, "speed": "medium", "vision": False, "ctx_k": 128},
+    "gpt-5-mini":                      {"stars": 4, "speed": "fast",   "vision": False, "ctx_k": 128},
+    # ── DeepSeek (web protocol) ──
+    "deepseek-chat":                   {"stars": 5, "speed": "medium", "vision": False, "ctx_k": 64},
     # ── Groq ──
     "llama-3.1-8b-instant":            {"stars": 3, "speed": "fast",   "vision": False, "ctx_k": 128},
     "llama-3.3-70b-versatile":         {"stars": 5, "speed": "medium", "vision": False, "ctx_k": 128},
@@ -81,6 +87,42 @@ _MODEL_META: dict[str, dict] = {
 }
 
 _PROVIDER_CATALOG = [
+    {
+        "name": "chatgpt",
+        "label": "ChatGPT (Web)",
+        "emoji": "🤖",
+        "tier": "free",
+        "desc": "ChatGPT via chatgpt.com — no API key, sign in once via the setup script",
+        "free_info": "Free tier on chatgpt.com",
+        "signup_url": "https://chatgpt.com",
+        "models": [
+            "auto",
+            "gpt-5",
+            "gpt-5-mini",
+        ],
+        "supports_vision": False,
+        "supports_embed": False,
+        "key_field": None,
+        "model_field": "chatgpt_model",
+        "key_placeholder": "First run: cd ../ai-providers-direct && npm run chatgpt:setup",
+    },
+    {
+        "name": "deepseek",
+        "label": "DeepSeek (Web)",
+        "emoji": "🐋",
+        "tier": "free",
+        "desc": "DeepSeek V3 via the web protocol — no API key, just paste a browser session token",
+        "free_info": "Free tier on chat.deepseek.com",
+        "signup_url": "https://chat.deepseek.com",
+        "models": [
+            "deepseek-chat",
+        ],
+        "supports_vision": False,
+        "supports_embed": False,
+        "key_field": "deepseek_user_token",
+        "model_field": None,
+        "key_placeholder": "Paste DeepSeek web token (run npm run token:bookmarklet)...",
+    },
     {
         "name": "groq",
         "label": "Groq",
@@ -259,6 +301,8 @@ _PROVIDER_CATALOG = [
 
 _ALLOWED_SETTINGS = {
     "llm_provider",
+    "deepseek_user_token", "deepseek_thinking",
+    "chatgpt_model",
     "mistral_api_key", "mistral_text_model",
     "openai_api_key",
     "anthropic_api_key",
@@ -348,11 +392,20 @@ async def api_list_providers() -> dict:
                 "vision": mm["vision"],
                 "ctx_k": mm["ctx_k"],
             })
+        # ChatGPT has no key — it's configured iff the Chrome profile that
+        # `npm run chatgpt:setup` creates is present on disk.
+        if meta["name"] == "chatgpt":
+            from ...llm.providers.chatgpt import is_setup_complete
+            is_configured = is_setup_complete()
+            key_hint = "ready (Chrome profile present)" if is_configured else ""
+        else:
+            is_configured = bool(current_key) or meta["name"] == "ollama"
+            key_hint = _key_hint(current_key)
         entry = {
             **meta,
             "models": enriched_models,
-            "is_configured": bool(current_key) or meta["name"] == "ollama",
-            "key_hint": _key_hint(current_key),
+            "is_configured": is_configured,
+            "key_hint": key_hint,
             "current_model": current_model,
         }
         result.append(entry)

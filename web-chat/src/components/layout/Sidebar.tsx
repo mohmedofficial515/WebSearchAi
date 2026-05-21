@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import type { TaskRecord } from '@/stores/tasksStore';
 import type { Conversation } from '@/stores/conversationsStore';
+import { useSavedDesignsStore } from '@/stores/savedDesignsStore';
 import { formatTokens } from '@/lib/tokens';
 
 interface SidebarProps {
@@ -25,8 +27,32 @@ export function Sidebar({
   onDeleteConversation,
   totalTokens,
 }: SidebarProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isRtl = i18n.language === 'ar';
   const hasConversations = conversations && conversations.length > 0;
+
+  const { designs, renameDesign, deleteDesign } = useSavedDesignsStore();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+
+  function openDesign(content: string, _name: string) {
+    const blob = new Blob([content], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const win = window.open(url, '_blank');
+    // Revoke the object URL after a short delay to free memory
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    if (win) win.focus();
+  }
+
+  function startRename(id: string, currentName: string) {
+    setEditingId(id);
+    setEditName(currentName);
+  }
+
+  function commitRename(id: string) {
+    if (editName.trim()) renameDesign(id, editName.trim());
+    setEditingId(null);
+  }
 
   return (
     <aside className="flex flex-col h-full bg-slate-50 dark:bg-slate-900 border-e border-slate-100 dark:border-slate-800 p-3 gap-2 w-full">
@@ -47,6 +73,62 @@ export function Sidebar({
           <span className="font-mono font-medium text-indigo-600 dark:text-indigo-400">
             {formatTokens(totalTokens)}
           </span>
+        </div>
+      )}
+
+      {/* ── Saved Designs ── */}
+      {designs.length > 0 && (
+        <div className="mt-1">
+          <p className="px-2 text-[11px] font-medium text-violet-500 dark:text-violet-400 uppercase tracking-wide mb-1 flex items-center gap-1">
+            <span>🎨</span>
+            {t('sidebar.savedDesigns')}
+          </p>
+          <div className="space-y-0.5 max-h-40 overflow-y-auto">
+            {designs.map((design) => (
+              <div
+                key={design.id}
+                className="group flex items-center gap-1 rounded-lg hover:bg-violet-50 dark:hover:bg-violet-950/30 transition-colors"
+              >
+                {editingId === design.id ? (
+                  <input
+                    autoFocus
+                    className="flex-1 px-2 py-1.5 text-sm bg-white dark:bg-slate-800 border border-violet-300 rounded-lg outline-none text-slate-800 dark:text-slate-200"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    onBlur={() => commitRename(design.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') commitRename(design.id);
+                      if (e.key === 'Escape') setEditingId(null);
+                    }}
+                  />
+                ) : (
+                  <button
+                    onClick={() => openDesign(design.content, design.name)}
+                    onDoubleClick={() => startRename(design.id, design.name)}
+                    title={isRtl ? 'انقر للفتح / انقر مرتين للتعديل' : 'Click to open / double-click to rename'}
+                    className="flex-1 text-start px-3 py-2 text-sm text-slate-700 dark:text-slate-300 min-w-0"
+                  >
+                    <p className="truncate leading-snug text-violet-700 dark:text-violet-300">{design.name}</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                      {new Date(design.createdAt).toLocaleDateString(i18n.language)}
+                    </p>
+                  </button>
+                )}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (confirm(isRtl ? 'حذف هذا التصميم؟' : 'Delete this design?'))
+                      deleteDesign(design.id);
+                  }}
+                  aria-label="حذف"
+                  className="opacity-0 group-hover:opacity-100 me-1 flex-shrink-0 w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-xs transition-all"
+                >
+                  🗑
+                </button>
+              </div>
+            ))}
+          </div>
+          <div className="border-t border-slate-100 dark:border-slate-800 mt-2" />
         </div>
       )}
 

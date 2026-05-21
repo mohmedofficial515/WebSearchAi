@@ -8,9 +8,9 @@ export interface ArchiveSuggestion {
   score: number;
 }
 
-const MIN_QUERY_LEN = 8;
+const MIN_QUERY_LEN = 12;
 const SCORE_THRESHOLD = 0.55;
-const DEBOUNCE_MS = 500;
+const DEBOUNCE_MS = 1000;
 
 export function useArchiveSuggestion(query: string): ArchiveSuggestion | null {
   const [suggestion, setSuggestion] = useState<ArchiveSuggestion | null>(null);

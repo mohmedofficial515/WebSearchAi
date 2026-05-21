@@ -26,6 +26,11 @@ class MistralError(RuntimeError):
     pass
 
 
+class MistralAuthError(RuntimeError):
+    """Raised when authentication fails (401 or 403) to prevent endless retries."""
+    pass
+
+
 class MistralClient:
     def __init__(
         self,
@@ -35,7 +40,7 @@ class MistralClient:
     ) -> None:
         self.api_key = api_key or settings.mistral_api_key
         if not self.api_key:
-            raise MistralError(
+            raise MistralAuthError(
                 "MISTRAL_API_KEY missing. Set it in .env (get a free key at "
                 "https://console.mistral.ai/)"
             )
@@ -50,6 +55,7 @@ class MistralClient:
         stop=stop_after_attempt(4),
         wait=wait_exponential(multiplier=1.5, min=2, max=30),
         retry=retry_if_exception_type((httpx.HTTPError, MistralError)),
+        retry_error_callback=lambda state: None, # Let the original exception propagate directly instead of wrapped in RetryError
     )
     async def _request(self, payload: dict[str, Any]) -> dict[str, Any]:
         headers = {
@@ -60,6 +66,18 @@ class MistralClient:
         if r.status_code == 429:
             log.warning("⏳ Mistral rate-limited; backing off…")
             raise MistralError("rate_limited")
+        if r.status_code in (401, 403):
+            # Auth error - raising a specific error class will not be retried if we exclude it, or we can raise it and bypass retry entirely.
+            # But retry_if_exception_type covers MistralError, and MistralAuthError inherits from MistralError.
+            # Let's make sure it raises and we don't retry by either:
+            # A) Not inheriting MistralAuthError from MistralError, or
+            # B) Handling it explicitly or raising a custom non-retried exception class.
+            # Since retry_if_exception_type checks isinstance(), if MistralAuthError inherits from MistralError, it WILL be retried.
+            # Therefore, we should either:
+            # 1. NOT inherit MistralAuthError from MistralError (e.g. let it inherit directly from RuntimeError), or
+            # 2. Add custom logic or check in retry predicate.
+            # Let's inherit from Exception/RuntimeError directly and handle it so that it is NOT retried!
+            raise MistralAuthError(f"Authentication failed ({r.status_code}): {r.text[:200]}")
         if r.status_code >= 500:
             raise MistralError(f"server_error {r.status_code}: {r.text[:200]}")
         if r.status_code >= 400:

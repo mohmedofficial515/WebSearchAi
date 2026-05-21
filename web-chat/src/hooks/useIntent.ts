@@ -4,7 +4,7 @@ import type { IntentResponse } from '@/lib/api';
 
 export type { IntentResponse };
 
-const DEBOUNCE_MS = 300;
+const DEBOUNCE_MS = 800;
 
 export function useIntent(message: string): IntentResponse | null {
   const [result, setResult] = useState<IntentResponse | null>(null);
@@ -15,7 +15,7 @@ export function useIntent(message: string): IntentResponse | null {
     if (timerRef.current) clearTimeout(timerRef.current);
     abortRef.current?.abort();
 
-    if (!message.trim() || message.startsWith('/')) {
+    if (!message.trim() || message.trim().length < 4 || message.startsWith('/')) {
       setResult(null);
       return;
     }
