@@ -4,6 +4,8 @@ import { useTaskStream } from '@/hooks/useTaskStream';
 import { getSkill } from '@/lib/skills';
 import { ActionIcon } from '@/components/live/ActionIcon';
 import { ContinuationCard } from '@/components/chat/ContinuationCard';
+import { QuestionCard } from '@/components/chat/QuestionCard';
+import { PlanChecklist } from './PlanChecklist';
 import type { TaskOutcome } from '@/lib/types';
 
 interface AgentRunCardProps {
@@ -63,10 +65,17 @@ function outcomeStyling(outcome: TaskOutcome | null): {
   };
 }
 
+const CSP_META = `<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; script-src 'none'; img-src data: blob: https:;">`;
+function injectCsp(html: string): string {
+  return html.includes('<head>') ? html.replace('<head>', `<head>\n  ${CSP_META}`) : `${CSP_META}\n${html}`;
+}
+
 export function AgentRunCard({ taskId, goal, skill = 'run', onSuggestion, onContinue, onEnd }: AgentRunCardProps) {
   const { t } = useTranslation();
   const stream = useTaskStream(taskId);
   const meta = getSkill(skill);
+  const htmlContent = stream.skillResult?.content as string | undefined;
+  const htmlFilename = stream.skillResult?.filename as string | undefined;
   const isDone = stream.status === 'succeeded' || stream.status === 'failed';
   // Outcome-driven styling wins over the raw status when the task
   // finished but didn't actually produce an answer. This is the user-
@@ -98,7 +107,20 @@ export function AgentRunCard({ taskId, goal, skill = 'run', onSuggestion, onCont
 
         {/* Body */}
         <div className="px-5 py-4 min-h-[60px]">
-          {(stream.status === 'connecting' || (stream.status === 'running' && stream.steps.length === 0)) && (
+          {/* Plan checklist — shows before and during execution */}
+          {stream.plan && stream.plan.length > 0 && (
+            <PlanChecklist
+              steps={stream.plan}
+              completedCount={
+                stream.status === 'succeeded' || stream.status === 'failed'
+                  ? stream.plan.length
+                  : Math.min(stream.steps.length, stream.plan.length - 1)
+              }
+              running={stream.status === 'running'}
+            />
+          )}
+
+          {(stream.status === 'connecting' || (stream.status === 'running' && stream.steps.length === 0 && !stream.plan)) && (
             <div className="flex items-center gap-2 text-sm text-slate-400">
               <span className="animate-pulse text-amber-400">●</span>
               <span>{t('task.running')}</span>
@@ -106,13 +128,14 @@ export function AgentRunCard({ taskId, goal, skill = 'run', onSuggestion, onCont
           )}
 
           {stream.status === 'running' && stream.steps.length > 0 && (
-            <div className="space-y-2">
+            <div className="space-y-1.5 border-t border-slate-100 dark:border-slate-800 pt-3 mt-1">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">النشاط الحالي</p>
               {stream.steps.slice(-4).map((step, i) => (
-                <div key={i} className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                <div key={i} className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
                   <ActionIcon actionType={step.actionType} />
                   <span className="flex-1 truncate">{step.actionLabel}</span>
                   {step.ok !== undefined && (
-                    <span>{step.ok ? '✅' : '❌'}</span>
+                    <span className="text-[10px]">{step.ok ? '✓' : '✗'}</span>
                   )}
                 </div>
               ))}
@@ -142,7 +165,32 @@ export function AgentRunCard({ taskId, goal, skill = 'run', onSuggestion, onCont
             </p>
           )}
 
-          {isDone && stream.sources.length > 0 && (
+          {/* HTML preview for design_agent output */}
+          {isDone && htmlContent && (
+            <div className="mt-3 border-t border-slate-100 dark:border-slate-800 pt-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-slate-400">{htmlFilename ?? 'صفحة HTML'}</span>
+                <button
+                  onClick={() => {
+                    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+                    window.open(URL.createObjectURL(blob), '_blank', 'noopener,noreferrer');
+                  }}
+                  className="text-xs px-2 py-1 rounded text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
+                >
+                  ↗ فتح
+                </button>
+              </div>
+              <iframe
+                srcDoc={injectCsp(htmlContent)}
+                title="design-preview"
+                sandbox="allow-same-origin allow-forms"
+                className="w-full border-0 rounded-lg overflow-hidden"
+                style={{ height: '380px' }}
+              />
+            </div>
+          )}
+
+          {isDone && !htmlContent && stream.sources.length > 0 && (
             <ul className="mt-3 space-y-1">
               {stream.sources.slice(0, 5).map((src, i) => (
                 <li key={i} className="text-xs">
@@ -171,6 +219,17 @@ export function AgentRunCard({ taskId, goal, skill = 'run', onSuggestion, onCont
           </div>
         )}
       </div>
+
+      {/* Design agent question card */}
+      {stream.pendingQuestion && (
+        <div className="mt-3">
+          <QuestionCard
+            taskId={taskId}
+            question={stream.pendingQuestion}
+            onAnswered={() => { /* WS will send next question or continue */ }}
+          />
+        </div>
+      )}
 
       {isDone && (
         <ContinuationCard

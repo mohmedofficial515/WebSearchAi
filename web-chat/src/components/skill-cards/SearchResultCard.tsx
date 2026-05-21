@@ -4,6 +4,7 @@ import { Copy, Check, ExternalLink } from 'lucide-react';
 import { useTaskStream } from '@/hooks/useTaskStream';
 import { ContinuationCard } from '@/components/chat/ContinuationCard';
 import { ActionIcon } from '@/components/live/ActionIcon';
+import { PlanChecklist } from './PlanChecklist';
 
 interface SearchResultCardProps {
   taskId: string;
@@ -95,20 +96,30 @@ export function SearchResultCard({ taskId, goal, onSuggestion, onContinue, onEnd
 
         {/* Body */}
         <div className="px-5 py-4 min-h-[60px]">
-          {/* Running steps */}
+          {/* Plan checklist */}
+          {stream.plan && stream.plan.length > 0 && (
+            <PlanChecklist
+              steps={stream.plan}
+              completedCount={stream.status === 'succeeded' || stream.status === 'failed' ? stream.plan.length : Math.min(stream.steps.length, stream.plan.length - 1)}
+              running={stream.status === 'running'}
+            />
+          )}
+
+          {/* Running steps — live activity log */}
           {stream.status === 'running' && stream.steps.length > 0 && (
-            <div className="space-y-2 mb-3">
+            <div className="space-y-1.5 mb-3 border-t border-slate-100 dark:border-slate-800 pt-3 mt-1">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">النشاط الحالي</p>
               {stream.steps.slice(-3).map((step, i) => (
-                <div key={i} className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                <div key={i} className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
                   <ActionIcon actionType={step.actionType} />
                   <span className="flex-1 truncate">{step.actionLabel}</span>
-                  {step.ok !== undefined && <span>{step.ok ? '✅' : '❌'}</span>}
+                  {step.ok !== undefined && <span className="text-[10px]">{step.ok ? '✓' : '✗'}</span>}
                 </div>
               ))}
             </div>
           )}
 
-          {(stream.status === 'connecting' || (stream.status === 'running' && stream.steps.length === 0)) && (
+          {(stream.status === 'connecting' || (stream.status === 'running' && stream.steps.length === 0 && !stream.plan)) && (
             <div className="flex items-center gap-2 text-sm text-slate-400">
               <span className="animate-pulse text-indigo-400">●</span>
               <span>{t('task.running')}</span>

@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useTaskStream } from '@/hooks/useTaskStream';
 import { ContinuationCard } from '@/components/chat/ContinuationCard';
+import { PlanChecklist } from './PlanChecklist';
 
 interface HtmlArtifactCardProps {
   taskId: string;
@@ -88,7 +89,16 @@ export function HtmlArtifactCard({ taskId, goal, onSuggestion, onContinue, onEnd
 
         {/* Body */}
         <div className="px-0 py-0 min-h-[80px]">
-          {!isDone && (
+          {stream.plan && stream.plan.length > 0 && !isDone && (
+            <div className="px-5 pt-4">
+              <PlanChecklist
+                steps={stream.plan}
+                completedCount={Math.min(stream.steps.length, stream.plan.length - 1)}
+                running={stream.status === 'running'}
+              />
+            </div>
+          )}
+          {!isDone && !stream.plan && (
             <div className="flex items-center gap-2 text-sm text-slate-400 px-5 py-4">
               <span className="animate-pulse text-orange-400">●</span>
               <span>{t('task.running')}</span>

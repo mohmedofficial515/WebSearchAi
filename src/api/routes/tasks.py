@@ -1,4 +1,4 @@
-"""Task management endpoints (list / get / cancel / events / report).
+"""Task management endpoints (list / get / cancel / events / report / answer).
 
 Distinct from `src/api/tasks.py` which owns the in-memory `TaskManager`
 singleton — this module is only the HTTP surface in front of it.
@@ -46,6 +46,16 @@ async def cancel_task(task_id: str) -> dict:
     ok = task_manager.cancel(task_id)
     if not ok:
         raise HTTPException(409, "cannot cancel task")
+    return {"ok": True}
+
+
+@router.post("/{task_id}/answer")
+async def submit_task_answer(task_id: str, body: dict) -> dict:
+    """Submit a user answer for a paused design-agent question."""
+    from ...core.answer_bus import post_answer
+    ok = post_answer(task_id, body)
+    if not ok:
+        raise HTTPException(404, "no pending question for this task")
     return {"ok": True}
 
 

@@ -131,6 +131,13 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     placeholderAr: 'المنافسون', placeholderEn: 'competitors to compare',
   },
   {
+    command: '/design', skill: 'design_agent', icon: '🎨', category: 'artifact',
+    labelAr: 'وكيل التصميم', labelEn: 'Design agent',
+    descriptionAr: 'تصميم تفاعلي — يسألك عن تفضيلاتك ثم يبني الصفحة',
+    descriptionEn: 'Interactive design — asks your preferences then builds the page',
+    placeholderAr: 'وصف الصفحة المطلوبة', placeholderEn: 'describe the page',
+  },
+  {
     command: '/run', skill: 'run', icon: '🤖', category: 'misc',
     labelAr: 'تشغيل وكيل عام', labelEn: 'Generic agent',
     descriptionAr: 'تشغيل وكيل عام يقرّر الأداة تلقائياً',

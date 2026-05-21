@@ -5,6 +5,7 @@ import rehypeKatex from 'rehype-katex';
 import { useTranslation } from 'react-i18next';
 import { useTaskStream } from '@/hooks/useTaskStream';
 import { ContinuationCard } from '@/components/chat/ContinuationCard';
+import { PlanChecklist } from './PlanChecklist';
 
 interface MarkdownArtifactCardProps {
   taskId: string;
@@ -81,7 +82,14 @@ export function MarkdownArtifactCard({ taskId, goal, onSuggestion, onContinue, o
 
         {/* Body */}
         <div className="px-5 py-4 min-h-[80px]">
-          {!isDone && (
+          {stream.plan && stream.plan.length > 0 && !isDone && (
+            <PlanChecklist
+              steps={stream.plan}
+              completedCount={Math.min(stream.steps.length, stream.plan.length - 1)}
+              running={stream.status === 'running'}
+            />
+          )}
+          {!isDone && !stream.plan && (
             <div className="flex items-center gap-2 text-sm text-slate-400">
               <span className="animate-pulse text-green-400">●</span>
               <span>{t('task.running')}</span>

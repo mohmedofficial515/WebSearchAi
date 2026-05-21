@@ -508,6 +508,20 @@ def _dispatch_single(intent_kind: str, message: str, url: str | None,
             return result
         return task_manager.submit("competitor_matrix", {"goal": message}, _matrix_factory).task_id
 
+    if intent_kind == "design_agent":
+        from ...skills.design_agent import design_agent as _design_agent_skill
+
+        async def _design_agent_factory(_tid: str):
+            await _emit_task_plan(_tid, _SKILL_PHASES.get("html_artifact", []))
+            r = await _design_agent_skill(task_id=_tid, goal=message)
+            await _emit_skill_result(_tid, {
+                "skill": "html_artifact",
+                **r,
+                "summary_ar": f"تم إنشاء التصميم التفاعلي: {r.get('filename', '')}",
+            })
+            return r
+        return task_manager.submit("design_agent", {"goal": message}, _design_agent_factory).task_id
+
     # Default fallback — research.
     from ...core.agent import Agent as _AgentFallback
 

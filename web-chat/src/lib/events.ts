@@ -20,6 +20,7 @@ export type WsEventType =
   | 'pipeline_resumed'
   | 'pipeline_end'
   | 'completion_prompt'
+  | 'agent_question'
   | 'error';
 
 export interface WsBaseEvent {
@@ -210,6 +211,26 @@ export interface SkillResultEvent extends WsBaseEvent {
   data: Record<string, unknown>;
 }
 
+// agent_question — emitted when a skill pauses to ask the user a question
+export interface QuestionOption {
+  value: string;
+  label: string;
+  icon?: string;
+}
+
+export interface AgentQuestion {
+  question_id: string;
+  question: string;
+  field_type: 'single' | 'multi' | 'slider' | 'text';
+  options?: QuestionOption[];
+  range?: { min: number; max: number; step: number; defaultValue?: number };
+}
+
+export interface AgentQuestionEvent extends WsBaseEvent {
+  type: 'agent_question';
+  data: AgentQuestion;
+}
+
 // status — emitted by task_manager on task completion (succeeded/failed/cancelled)
 export interface StatusEvent extends WsBaseEvent {
   type: 'status';
@@ -240,4 +261,5 @@ export type WsEvent =
   | CompletionPromptEvent
   | WsErrorEvent
   | SkillResultEvent
-  | StatusEvent;
+  | StatusEvent
+  | AgentQuestionEvent;

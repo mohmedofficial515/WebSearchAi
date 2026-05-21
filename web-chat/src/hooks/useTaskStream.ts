@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { makeWs } from '@/lib/api';
 import type {
+  AgentQuestion,
   ArtifactMeta,
   ContinuationSuggestion,
   PlanStep,
@@ -34,6 +35,8 @@ export interface TaskStreamState {
   // legacy task without an outcome — treat as OK for back-compat.
   outcome: TaskOutcome | null;
   outcomeReason: string | null;
+  /** Pending question from design agent — null when no question is active */
+  pendingQuestion: AgentQuestion | null;
 }
 
 type Action =
@@ -41,6 +44,8 @@ type Action =
   | { type: 'PLAN'; steps: PlanStep[] }
   | { type: 'SCREENSHOT'; screenshot: string }
   | { type: 'STEP_ADD'; step: TimelineStep }
+  | { type: 'AGENT_QUESTION'; question: AgentQuestion }
+  | { type: 'QUESTION_ANSWERED' }
   | { type: 'STEP_UPDATE_LAST'; patch: Partial<TimelineStep> }
   | { type: 'SOURCES'; sources: Source[] }
   | { type: 'SUGGESTIONS'; suggestions: ContinuationSuggestion[] }
@@ -72,6 +77,7 @@ const INITIAL: TaskStreamState = {
   elapsedSec: null,
   outcome: null,
   outcomeReason: null,
+  pendingQuestion: null,
 };
 
 function reducer(state: TaskStreamState, action: Action): TaskStreamState {
@@ -80,6 +86,10 @@ function reducer(state: TaskStreamState, action: Action): TaskStreamState {
       return { ...state, status: 'connecting', error: null };
     case 'PLAN':
       return { ...state, plan: action.steps, status: 'running' };
+    case 'AGENT_QUESTION':
+      return { ...state, pendingQuestion: action.question };
+    case 'QUESTION_ANSWERED':
+      return { ...state, pendingQuestion: null };
     case 'SCREENSHOT':
       return { ...state, screenshot: action.screenshot };
     case 'STEP_ADD':
@@ -225,6 +235,37 @@ export function useTaskStream(taskId: string | null): TaskStreamState {
 
       case 'completion_prompt':
         dispatch({ type: 'SUGGESTIONS', suggestions: ev.data.suggestions });
+        break;
+
+      // Research-agent progress events — surfaced as timeline steps
+      case 'research_round': {
+        const d = ev.data as unknown as Record<string, unknown>;
+        dispatch({
+          type: 'STEP_ADD',
+          step: { step: 0, actionType: 'search', actionLabel: `بدء جولة بحث ${d.round ?? ''}` },
+        });
+        break;
+      }
+      case 'candidate_selected': {
+        const d = ev.data as unknown as Record<string, unknown>;
+        dispatch({
+          type: 'STEP_ADD',
+          step: { step: 0, actionType: 'navigate', actionLabel: `فحص المصدر: ${d.title ?? d.url ?? ''}` },
+        });
+        break;
+      }
+      case 'content_critiqued': {
+        const d = ev.data as unknown as Record<string, unknown>;
+        const score = typeof d.score === 'number' ? `(${Math.round((d.score as number) * 100)}%)` : '';
+        dispatch({
+          type: 'STEP_UPDATE_LAST',
+          patch: { ok: (d.score as number) > 0.4, note: String(d.reason ?? '') + ' ' + score },
+        });
+        break;
+      }
+
+      case 'agent_question':
+        dispatch({ type: 'AGENT_QUESTION', question: ev.data });
         break;
 
       case 'error':

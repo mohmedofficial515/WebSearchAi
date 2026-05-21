@@ -24,6 +24,7 @@ export const SKILLS: SkillMeta[] = [
   { id: 'summarize',         labelAr: 'تلخيص',         labelEn: 'Summarize',       icon: '📰', color: 'bg-sky-100 text-sky-800'      },
   { id: 'translate',         labelAr: 'ترجمة',          labelEn: 'Translate',       icon: '🌍', color: 'bg-emerald-100 text-emerald-800' },
   { id: 'competitor_matrix', labelAr: 'مقارنة',        labelEn: 'Competitor Matrix', icon: '📈', color: 'bg-indigo-100 text-indigo-800' },
+  { id: 'design_agent',      labelAr: 'وكيل التصميم',  labelEn: 'Design Agent',    icon: '🎨', color: 'bg-violet-100 text-violet-800' },
   { id: 'run',               labelAr: 'تشغيل',         labelEn: 'Run',             icon: '🤖', color: 'bg-neutral-100 text-neutral-700' },
 ];
 

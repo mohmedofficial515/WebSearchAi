@@ -256,7 +256,7 @@ export default function ChatPage() {
   );
 
   const handleContinue = useCallback(() => {
-    // User chose to continue — keep thread alive
+    composerRef.current?.focus();
   }, []);
 
   const handleEnd = useCallback(() => {

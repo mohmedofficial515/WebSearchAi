@@ -107,6 +107,13 @@ _AGGREGATOR_PENALTY_HOSTS = {
     "pinterest.com", "quora.com", "answers.com", "wikihow.com",
     "ehow.com", "answers.yahoo.com",
 }
+# Video platforms — always excluded from research results. These links
+# open video players, not text content, so they never help a researcher.
+_VIDEO_HOSTS: set[str] = {
+    "youtube.com", "youtu.be", "vimeo.com", "dailymotion.com",
+    "twitch.tv", "tiktok.com", "bilibili.com", "rumble.com",
+    "odysee.com", "loom.com", "wistia.com", "sproutvideo.com",
+}
 
 
 def _host_of(url: str) -> str:
@@ -281,6 +288,8 @@ class SearchAgent:
                 if not url:
                     continue
                 host = _host_of(url)
+                if host in _VIDEO_HOSTS:
+                    continue
                 if avoid_hosts and host in avoid_hosts:
                     continue
                 key = _dedupe_key(url)

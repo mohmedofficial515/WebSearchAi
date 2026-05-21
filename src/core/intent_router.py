@@ -81,6 +81,15 @@ _COMPONENTS_PATTERNS = [
     r"\bcomponent\s+gallery\b",
 ]
 
+# Interactive design agent (asks questions before building)
+_DESIGN_AGENT_PATTERNS = [
+    r"صمّ?م\s+لي\b", r"اصمّ?م\s+لي\b",
+    r"أنشئ\s+تصميم\s+تفاعلي", r"تصميم\s+تفاعلي",
+    r"وكيل\s+التصميم", r"ابدأ\s+تصميم",
+    r"\bdesign\s+(for\s+me|agent|interactive|wizard)\b",
+    r"\b/design\b",
+]
+
 # Design tokens
 _TOKENS_PATTERNS = [
     r"استخرج\s+(الألوان|الخطوط|لوحة)",
@@ -122,6 +131,7 @@ _RULES: list[tuple[list[re.Pattern[str]], str]] = [
     (_compile(_CLONE_PATTERNS), "clone"),
     (_compile(_COMPONENTS_PATTERNS), "components"),
     (_compile(_TOKENS_PATTERNS), "design_tokens"),
+    (_compile(_DESIGN_AGENT_PATTERNS), "design_agent"),
     (_compile(_EXPLORE_PATTERNS), "explore"),
 ]
 

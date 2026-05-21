@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Message } from '@/lib/types';
 import { MessageBubble } from './MessageBubble';
@@ -97,10 +97,19 @@ function SkillCard({ taskId, goal, skill, onSuggestion, onContinue, onEnd }: Ski
 
 export function ChatThread({ messages, onChip, onSuggestion, onContinue, onEnd, thinking = false }: ChatThreadProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [latestAssistantId, setLatestAssistantId] = useState<string | null>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length]);
+    // Track the last assistant text message (not task cards) for typing animation
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i]!;
+      if (m.role === 'assistant' && !m.taskId && !m.pipelineId && m.text) {
+        setLatestAssistantId(m.id);
+        break;
+      }
+    }
+  }, [messages.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (messages.length === 0) {
     return <EmptyState onChip={onChip} />;
@@ -150,7 +159,13 @@ export function ChatThread({ messages, onChip, onSuggestion, onContinue, onEnd, 
 
           return (
             <motion.div key={msg.id} variants={msgVariants} initial="hidden" animate="show" exit="exit">
-              <MessageBubble role="assistant" text={msg.text} timestamp={msg.timestamp} tokenCount={msg.tokenCount} />
+              <MessageBubble
+                role="assistant"
+                text={msg.text}
+                timestamp={msg.timestamp}
+                tokenCount={msg.tokenCount}
+                isNew={msg.id === latestAssistantId}
+              />
             </motion.div>
           );
         })}
